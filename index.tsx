@@ -10,7 +10,7 @@ import definePlugin from "@utils/types";
 import { ChannelStore, FluxDispatcher, GuildStore, Menu } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
-import { BiomesConfig, BiomesKeywords,FullJoinerConfig, settings } from "./settings";
+import { BiomesConfig, BiomesKeywords, FullJoinerConfig, settings } from "./settings";
 
 // Patch pro ContextMenu
 const ChatBarContextCheckbox: NavContextMenuPatchCallback = children => {
@@ -67,6 +67,8 @@ export default definePlugin({
     },
 
     async handleNewMessage(data: { channelId: string; message: any; }) {
+        const startAll = performance.now();
+
         const { channelId, message } = data;
         const config = Settings.plugins.SolsAutoJoiner as unknown as FullJoinerConfig;
         if (!this.monitoredSet?.has(channelId)) return;
@@ -88,20 +90,17 @@ export default definePlugin({
             const cooldownSeconds = parseInt(config._dev_dedupe_link_cooldown) || 30;
             const lastTime = this.linkTimestamps?.get(link) ?? 0;
             if (now - lastTime < cooldownSeconds * 1000) {
-                console.log(`[SolsAutoJoiner] ⏳ ${code} | Code is on dedupe cooldown (${now - lastTime}ms)`);
+                console.log(`[SolsAutoJoiner] ⏳ ${code} | Dedupe cooldown (${now - lastTime}ms)`);
                 return true;
             }
             return false;
         };
 
-        const markLinkProcessed = (link: string, code: string) => {
+        const markLinkProcessed = (link: string) => {
             const now = Date.now();
             const cooldownSeconds = parseInt(config._dev_dedupe_link_cooldown) || 30;
             this.linkTimestamps?.set(link, now);
-            setTimeout(() => {
-                this.linkTimestamps?.delete(link);
-                // console.log(`[SolsAutoJoiner] ⏱ ${code} | Dedupe cooldown expired`);
-            }, cooldownSeconds * 1000);
+            setTimeout(() => this.linkTimestamps?.delete(link), cooldownSeconds * 1000);
         };
 
         const matchBiomes = (text: string) => {
@@ -109,7 +108,7 @@ export default definePlugin({
                 .filter(([biome]) => config[biome as keyof BiomesConfig])
                 .filter(([_, keywords]) =>
                     keywords.some(kw => {
-                        // eslint-disable-next-line
+                        // eslint-disable-next-line @stylistic/quotes
                         const pattern = new RegExp(`\\b${kw.replace(/\s+/g, '\\s+')}\\b`, "i");
                         return pattern.test(text);
                     })
@@ -119,13 +118,14 @@ export default definePlugin({
 
         const isIgnoredUser = (id: string) => {
             if (config.IgnoredUsers.split(",").map(x => x.trim()).includes(id)) {
-                console.log(`[SolsAutoJoiner] 🚫 ${id} | User is in ignore list`);
+                console.log(`[SolsAutoJoiner] 🚫 ${id} | Ignored user`);
                 return true;
             }
             return false;
         };
 
         const sendNotification = (link: string, code: string, biome: string) => {
+            const startNotify = performance.now();
             if (!config.Notifications) return;
             const channel = ChannelStore.getChannel(channelId);
             const channelName = channel?.name ? `#${channel.name}` : `#${channelId}`;
@@ -143,62 +143,80 @@ export default definePlugin({
             try {
                 const notif = new Notification(title, { body });
                 notif.onclick = () => {
-                    // console.log(`[SolsAutoJoiner] 🖱 ${code} | Notification clicked`);
                     try {
                         const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
                         Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
                     } catch (err) {
-                        console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to open Roblox from notification:`, err);
+                        console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to open Roblox from notif:`, err);
                     }
                 };
             } catch (err) {
-                console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to send notification`, err);
+                console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to send notif`, err);
             }
+
+            const notifyTime = performance.now() - startNotify;
+            console.log(`[SolsAutoJoiner] ⏱️ ${code} | sendNotification took ${notifyTime.toFixed(2)}ms`);
         };
 
         const autoJoin = async (link: string, code: string, biome: string) => {
+            const startJoin = performance.now();
             if (!config.AutoJoin) return;
             try {
-                console.log(`[SolsAutoJoiner] 🚀 ${code} | Autojoining biome ${biome}`);
+                console.log(`[SolsAutoJoiner] 🚀 ${code} | Autojoining ${biome}`);
                 const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
                 await Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
 
                 if (config.disableAutoJoinAfterSuccess) {
                     settings.store.AutoJoin = false;
-                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | AutoJoin disabled because we completed a join!`);
+                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | AutoJoin disabled`);
                 }
                 if (config.disableNotificationsAfterSuccess) {
                     settings.store.Notifications = false;
-                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | Notifications disabled because we completed a join!`);
+                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | Notifications disabled`);
                 }
             } catch (err) {
                 console.error(`[SolsAutoJoiner] ⚠️ ${code} | Autojoin failed:`, err);
             }
+            const joinTime = performance.now() - startJoin;
+            console.log(`[SolsAutoJoiner] ⏱️ ${code} | autoJoin took ${joinTime.toFixed(2)}ms`);
         };
 
-        // Loop principal
-        for (const { link, code } of extractLinks(content)) {
-            if (isOnCooldown(link, code)) continue;
-            markLinkProcessed(link, code);
+        // Loop principal com métricas
+        const loopStart = performance.now();
+        const links = extractLinks(content);
+        console.log(`[SolsAutoJoiner] 🧩 Found ${links.length} link(s)`);
 
+        for (const { link, code } of links) {
+            const startLoop = performance.now();
+
+            if (isOnCooldown(link, code)) continue;
+            markLinkProcessed(link);
+
+            const biomeStart = performance.now();
             const matchedBiomes = matchBiomes(content);
+            const biomeTime = performance.now() - biomeStart;
+
             if (matchedBiomes.length === 0) {
-                console.log(`[SolsAutoJoiner] ❌ ${code} | No matching biomes`);
+                console.log(`[SolsAutoJoiner] ❌ ${code} | No biomes (${biomeTime.toFixed(2)}ms)`);
                 continue;
             }
             if (matchedBiomes.length > 1) {
-                console.log(`[SolsAutoJoiner] ⚠️ ${code} | Multiple biomes matched: ${matchedBiomes.join(", ")}`);
+                console.log(`[SolsAutoJoiner] ⚠️ ${code} | Multiple biomes: ${matchedBiomes.join(", ")} (${biomeTime.toFixed(2)}ms)`);
                 continue;
             }
             if (isIgnoredUser(userId)) continue;
 
             const biome = matchedBiomes[0];
-            console.log(`[SolsAutoJoiner] ✅ ${code} | Valid for biome ${biome}`);
+            console.log(`[SolsAutoJoiner] ✅ ${code} | Biome ${biome} (${biomeTime.toFixed(2)}ms)`);
 
-            sendNotification(link, code, biome);
             await autoJoin(link, code, biome);
+            sendNotification(link, code, biome);
+
+            const loopTime = performance.now() - startLoop;
+            console.log(`[SolsAutoJoiner] ⏲️ ${code} | total loop time ${loopTime.toFixed(2)}ms`);
         }
+
+        const totalTime = performance.now() - startAll;
+        console.log(`[SolsAutoJoiner] 🕒 Message processed in ${totalTime.toFixed(2)}ms`);
     }
-
-
 });
