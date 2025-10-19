@@ -135,7 +135,7 @@ export default definePlugin({
 
             const title = `ℹ️ Link found! - ${biome}`;
             const body = [
-                `Code: ${code}`,
+                `Server: ${code}`,
                 `In channel: ${channelName} (${guildName})`,
                 `Sent by: ${username} (${userId})`
             ].join("\n");
