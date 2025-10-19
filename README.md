@@ -1,7 +1,7 @@
 # SolsAutoJoiner
 
 **SolsAutoJoiner** is a Vencord plugin for Discord that monitors specific channels for private Roblox server links and allows quick access to those servers.  
-It was created as an alternative to "selfbotting" snipers (which are not recommended) and, as an integrated Vencord plugin, provides easier setup and smoother operation once installed.
+It was created for me, as an alternative to "selfbotting" snipers (which I personally don't like) and, as an integrated Vencord plugin, provides easier setup and smoother operation once installed.
 
 ---
 
@@ -55,3 +55,9 @@ You can quickly re-enable it with Shift + Right-Click on the menu button, with a
 - The plugin relies on Discord's client to receive message events. Only channels that have been visited or synchronized by the client can trigger AutoJoin and notifications.
 - Ensure you review your biome and notification settings to avoid unintended joins.
 - **Important:** The plugin does **not verify if the server belongs to Sol's RNG**. Only monitor trusted channels to avoid problematic situations.
+
+---
+
+## Post-notes
+This project was severely vibe-coded with chatgpt and grok at like 3am in the morning. 
+Made with ❤️ to whoever finds it useful.
