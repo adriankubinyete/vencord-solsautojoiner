@@ -7,7 +7,7 @@
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { Settings } from "@api/Settings";
 import definePlugin from "@utils/types";
-import { ChannelStore, FluxDispatcher, GuildStore, Menu } from "@webpack/common";
+import { ChannelStore, FluxDispatcher, GuildStore, Menu, MessageStore } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
 import { BiomesConfig, BiomesKeywords, FullJoinerConfig, settings } from "./settings";
@@ -47,6 +47,49 @@ export default definePlugin({
     monitoredSet: null as Set<string> | null,
     linkTimestamps: null as Map<string, number> | null,
 
+    /**
+     * Tenta forçar a subscrição nos canais monitorados, sem abrir o histórico.
+     */
+    async forceLoadMonitoredChannels(monitored: Set<string>) {
+        if (!monitored.size) return;
+
+        let success = 0;
+        let fail = 0;
+
+        for (const channelId of monitored) {
+            try {
+                const channel = ChannelStore.getChannel(channelId);
+                if (!channel) {
+                    console.warn(`[SolsAutoJoiner] ⚠️ Channel ${channelId} not found in ChannelStore.`);
+                    fail++;
+                    continue;
+                }
+
+                if (MessageStore?.startChannel) {
+                    MessageStore.startChannel(channelId);
+                } else if (MessageStore?.subscribeToChannel) {
+                    MessageStore.subscribeToChannel(channelId);
+                } else {
+                    try {
+                        // fallback — tenta importar o módulo de canais
+                        // @ts-ignore
+                        const ChannelActions = await import("@webpack/channels");
+                        if (ChannelActions?.joinChannel) await ChannelActions.joinChannel(channelId);
+                    } catch {
+                        // nada
+                    }
+                }
+
+                success++;
+            } catch (err) {
+                console.error(`[SolsAutoJoiner] ❌ Failed to subscribe to channel ${channelId}:`, err);
+                fail++;
+            }
+        }
+
+        console.log(`[SolsAutoJoiner] ✅ Force-loaded ${success} channels (${fail} failed).`);
+    },
+
     start() {
         const config = Settings.plugins.SolsAutoJoiner as unknown as FullJoinerConfig;
         this.monitoredSet = new Set(config.MonitoredChannels.split(",").map(id => id.trim()).filter(Boolean));
@@ -55,6 +98,13 @@ export default definePlugin({
         FluxDispatcher.subscribe("MESSAGE_CREATE", this.boundHandler);
 
         console.log("[SolsAutoJoiner] Monitoring channels:", Array.from(this.monitoredSet));
+
+        // ✅ Force-load channels on startup
+        if (this.monitoredSet.size > 0) {
+            this.forceLoadMonitoredChannels(this.monitoredSet)
+                .then(() => console.log("[SolsAutoJoiner] Finished subscribing to monitored channels."))
+                .catch(err => console.error("[SolsAutoJoiner] Error force-loading monitored channels:", err));
+        }
     },
 
     stop() {
