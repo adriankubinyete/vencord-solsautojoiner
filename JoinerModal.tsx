@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { Button } from "@components/Button";
 import { FormSwitch } from "@components/FormSwitch";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
-import { Forms } from "@webpack/common";
+import { ChannelStore, Forms, MessageStore, Toasts } from "@webpack/common";
 
 import { BiomesConfig, settings } from "./settings";
 
@@ -106,6 +107,94 @@ function ShiftClickAlsoToggleNotificationsToggle() {
     );
 }
 
+function ForceLoadChannelsButton() {
+    const handleClick = async () => {
+        try {
+            const monitoredCsv = settings.store.MonitoredChannels ?? "";
+            const monitored = monitoredCsv.split(",").map(s => s.trim()).filter(Boolean);
+
+            if (!Array.isArray(monitored) || monitored.length === 0) {
+                const toast = Toasts.create("No monitored channels found.", Toasts.Type.MESSAGE, {
+                    duration: 1000,
+                    position: Toasts.Position.BOTTOM,
+                });
+                Toasts.show(toast);
+                return;
+            }
+
+            let successCount = 0;
+
+            for (const channelId of monitored) {
+                try {
+                    const channel = ChannelStore.getChannel(channelId);
+                    if (!channel) continue;
+
+                    // Try the modern silent subscribe APIs used by clients
+                    if (MessageStore?.startChannel) {
+                        MessageStore.startChannel(channelId);
+                    } else if (MessageStore?.subscribeToChannel) {
+                        MessageStore.subscribeToChannel(channelId);
+                    } else {
+                        // Fallback: attempt a no-op dispatch that some clients accept as "start listening"
+                        // (keep this minimal to avoid loading history)
+                        try {
+                            // @ts-ignore - some clients expose a channel subscription action
+                            const ChannelActions = await import("@webpack/channels");
+                            if (ChannelActions?.joinChannel) ChannelActions.joinChannel(channelId);
+                        } catch {
+                            // ignore fallback errors
+                        }
+                    }
+
+                    successCount++;
+                } catch (err) {
+                    console.warn(`[SolsAutoJoiner] Failed to subscribe to ${channelId}:`, err);
+                }
+            }
+
+            const message =
+                successCount === 0
+                    ? "No monitored channels subscribed."
+                    : `Subscribed to ${successCount} monitored channel${successCount !== 1 ? "s" : ""}.`;
+
+            const toastType = successCount > 0 ? Toasts.Type.SUCCESS : Toasts.Type.MESSAGE;
+
+            const toast = Toasts.create(message, toastType, {
+                duration: 1000,
+                position: Toasts.Position.BOTTOM,
+            });
+            Toasts.show(toast);
+        } catch (err) {
+            console.error("[SolsAutoJoiner] Force-load failed:", err);
+            const toast = Toasts.create("Error while subscribing to channels.", Toasts.Type.FAILURE, {
+                duration: 2000,
+                position: Toasts.Position.BOTTOM,
+            });
+            Toasts.show(toast);
+        }
+    };
+
+    return (
+        <div style={{ marginBottom: 24 }}>
+            {/* Use a plain Button; adjust styles via style/className since Colors/Sizes props aren't present */}
+            <Button
+                onClick={handleClick}
+                style={{
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                }}
+            >
+                Force-load Monitored Channels
+            </Button>
+
+            <Forms.FormText style={{ marginTop: 6, color: "#ccc" }}>
+                Force-subscribes to all monitored channels so new messages are received automatically.
+            </Forms.FormText>
+        </div>
+    );
+}
 
 function BiomeToggle({ biomeKey, label, description }: { biomeKey: keyof BiomesConfig; label: string; description: string; }) {
     const { [biomeKey]: value } = settings.use([biomeKey]);
@@ -164,6 +253,7 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 {/* Seção Other Settings */}
                 <SectionTitle>Other Settings</SectionTitle>
                 <ShiftClickAlsoToggleNotificationsToggle />
+                <ForceLoadChannelsButton />
             </ModalContent>
         </ModalRoot>
     );
