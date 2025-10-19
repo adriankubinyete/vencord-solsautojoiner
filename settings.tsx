@@ -27,8 +27,18 @@ export const settings = definePluginSettings({
     },
     disableAutoJoinAfterSuccess: {
         type: OptionType.BOOLEAN,
-        description: "Disable AutoJoin after successful joins. This is recommended to avoid joining a new link while you're already in game, you can re-enable it manually via the chat icon or context menu.",
+        description: "Disable AutoJoin after successful joins. Only applies to automatic joins, not manual clicks on notifications. This is recommended to avoid joining a new link while you're already in game, you can re-enable it manually via the chat menu icon or context menu.",
         default: true
+    },
+    disableNotificationsAfterSuccess: {
+        type: OptionType.BOOLEAN,
+        description: "Disable Notifications after a successful join. Only applies to automatic joins, not manual clicks on notifications.",
+        default: false
+    },
+    shiftClickAlsoToggleNotifications: {
+        type: OptionType.BOOLEAN,
+        description: "When shift-clicking the chat bar icon, also toggle notifications along with AutoJoin.",
+        default: false
     },
     showIcon: {
         type: OptionType.BOOLEAN,
@@ -90,6 +100,8 @@ export interface JoinerConfig {
     MonitoredChannels: string;
     IgnoredUsers: string;
     disableAutoJoinAfterSuccess: boolean;
+    disableNotificationsAfterSuccess: boolean;
+    shiftClickAlsoToggleNotifications: boolean;
     _dev_dedupe_link_cooldown: string; // string que será interpretada como número
 }
 

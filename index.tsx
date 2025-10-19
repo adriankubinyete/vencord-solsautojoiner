@@ -150,10 +150,14 @@ export default definePlugin({
                     notif.onclick = () => {
                         console.log(`[SolsAutoJoiner] Notification clicked, opening Roblox link: ${linkCopy}`);
 
-                        // Desativa AutoJoin após join manual via notificação (se configurado)
-                        if (config.disableAutoJoinAfterSuccess) {
-                            settings.store.AutoJoin = false;
-                        }
+                        // i dont think this is expected behavior: if you click a notif, it shouldnt mess with your settings.
+                        // if you clicked in a notif in the first place your auto join is probably already off. and clicking a notif shouldnt disable other notifs either
+                        // if (config.disableAutoJoinAfterSuccess) {
+                        //     settings.store.AutoJoin = false;
+                        // }
+                        // if (config.disableNotificationsAfterSuccess) {
+                        //     settings.store.Notifications = false;
+                        // }
 
                         try {
                             const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
@@ -177,7 +181,12 @@ export default definePlugin({
                     // Desativa AutoJoin após join automático (se configurado)
                     if (config.disableAutoJoinAfterSuccess) {
                         settings.store.AutoJoin = false;
-                        console.log("[SolsAutoJoiner] AutoJoin disabled after successful join.");
+                        // console.log("[SolsAutoJoiner] AutoJoin disabled after successful join.");
+                    }
+
+                    if (config.disableNotificationsAfterSuccess) {
+                        settings.store.Notifications = false;
+                        // console.log("[SolsAutoJoiner] Notifications disabled after successful join.");
                     }
                 } catch (err) {
                     console.error("[SolsAutoJoiner] Failed to autojoin Roblox:", err);

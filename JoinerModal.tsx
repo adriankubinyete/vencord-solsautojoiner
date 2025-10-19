@@ -58,7 +58,7 @@ function NotificationsToggle() {
     );
 }
 
-function DisableAfterSuccessToggle() {
+function DisableAutoJoinAfterSuccessToggle() {
     const { disableAutoJoinAfterSuccess } = settings.use(["disableAutoJoinAfterSuccess"]);
 
     return (
@@ -73,6 +73,39 @@ function DisableAfterSuccessToggle() {
         </div>
     );
 }
+
+function DisableNotificationsAfterSuccessToggle() {
+    const { disableNotificationsAfterSuccess } = settings.use(["disableNotificationsAfterSuccess"]);
+
+    return (
+        <div style={{ marginBottom: 24 }}>
+            <FormSwitch
+                title="Disable Notifications After Success"
+                description="Disable Notifications after a successful join. Only applies to automatic joins, not manual clicks on notifications."
+                value={disableNotificationsAfterSuccess}
+                onChange={v => settings.store.disableNotificationsAfterSuccess = v}
+                hideBorder
+            />
+        </div>
+    );
+}
+
+function ShiftClickAlsoToggleNotificationsToggle() {
+    const { shiftClickAlsoToggleNotifications } = settings.use(["shiftClickAlsoToggleNotifications"]);
+
+    return (
+        <div style={{ marginBottom: 24 }}>
+            <FormSwitch
+                title="Shift-click also toggles Notifications"
+                description="When shift-clicking this menu icon in the chat bar, also toggle Notifications together with AutoJoin."
+                value={shiftClickAlsoToggleNotifications}
+                onChange={v => settings.store.shiftClickAlsoToggleNotifications = v}
+                hideBorder
+            />
+        </div>
+    );
+}
+
 
 function BiomeToggle({ biomeKey, label, description }: { biomeKey: keyof BiomesConfig; label: string; description: string; }) {
     const { [biomeKey]: value } = settings.use([biomeKey]);
@@ -108,7 +141,8 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
 
                 {/* Seção Disable After Success */}
                 <SectionTitle>Post-Join Behavior</SectionTitle>
-                <DisableAfterSuccessToggle />
+                <DisableAutoJoinAfterSuccessToggle />
+                <DisableNotificationsAfterSuccessToggle />
 
                 {/* Seção Biomes */}
                 <SectionTitle>Biomes</SectionTitle>
@@ -126,6 +160,10 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <BiomeToggle biomeKey="SNOWY" label="SNOWY" description=""/>
                 <BiomeToggle biomeKey="WINDY" label="WINDY" description="" />
                 <BiomeToggle biomeKey="RAINY" label="RAINY" description="" />
+
+                {/* Seção Other Settings */}
+                <SectionTitle>Other Settings</SectionTitle>
+                <ShiftClickAlsoToggleNotificationsToggle />
             </ModalContent>
         </ModalRoot>
     );

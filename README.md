@@ -15,7 +15,7 @@ It was created for me, as an alternative to "selfbotting" snipers (which I perso
 
 - **Quick biome configuration**  
   Enable the `showIcon` option to display a small cog button near the chat box. Clicking this button opens a menu to toggle desired biome detections.  
-  - **Shift + Right-Click** the cog button to toggle AutoJoin without opening the menu.  
+  - **Shift + Click** the cog button to toggle AutoJoin without opening the menu.  
   - A green dot will appear near the cog when AutoJoin is active.
   (You can also configure the biomes through the plugin settings page if you have `showIcon` option disabled)
 
@@ -25,7 +25,7 @@ It was created for me, as an alternative to "selfbotting" snipers (which I perso
 - **Join upon detection**  
   AutoJoin allows immediate entry to valid server links. It is recommended to **disable AutoJoin after each join** to prevent accidental joins to new servers while already in-game.  
   - This can be automated using the `disableAutoJoinAfterEachServerJoin` setting.  
-  - Re-enabling AutoJoin is as simple as Shift + Right-Clicking the cog button.
+  - Re-enabling AutoJoin is as simple as Shift + Clicking the cog button.
 
 - **Fast server entry**  
   The plugin uses `roblox://` commands for joining, allowing faster server entry compared to opening the link in a web browser.
@@ -35,7 +35,7 @@ It was created for me, as an alternative to "selfbotting" snipers (which I perso
 ## Why AutoJoin is Disabled After Each Join
 
 If multiple biomes trigger AutoJoin while you are already in a game, you risk being redirected to another server unexpectedly. Automatically disabling AutoJoin after each join prevents this.  
-You can quickly re-enable it with Shift + Right-Click on the menu button, with a green dot indicating AutoJoin is active.
+You can quickly re-enable it with Shift + Click on the menu button, with a green dot indicating AutoJoin is active.
 
 ---
 
@@ -45,7 +45,7 @@ You can quickly re-enable it with Shift + Right-Click on the menu button, with a
 2. Adjust the desired configuration: biomes to trigger, notifications, and AutoJoin options.
 3. Enable `showIcon`, `showContext`, and `disableAutoJoinAfterEachServerJoin` for best experience.
 4. Use the chat box cog menu to toggle biomes.
-5. Shift + Right-Click the cog to enable AutoJoin without opening the menu. The green dot indicates it's active.
+5. Shift + Click the cog to enable AutoJoin without opening the menu. The green dot indicates it's active.
 6. If AutoJoin triggers, join the server and complete your tasks. When finished, re-enable AutoJoin for the next link.
 
 ---
