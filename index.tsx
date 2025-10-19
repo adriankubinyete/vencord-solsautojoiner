@@ -100,7 +100,7 @@ export default definePlugin({
         console.log("[SolsAutoJoiner] Monitoring channels:", Array.from(this.monitoredSet));
 
         // ✅ Force-load channels on startup
-        if (this.monitoredSet.size > 0) {
+        if (settings.store.forceChannelSubscriptionOnStartup && this.monitoredSet.size > 0) {
             this.forceLoadMonitoredChannels(this.monitoredSet)
                 .then(() => console.log("[SolsAutoJoiner] Finished subscribing to monitored channels."))
                 .catch(err => console.error("[SolsAutoJoiner] Error force-loading monitored channels:", err));

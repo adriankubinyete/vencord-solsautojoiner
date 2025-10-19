@@ -67,6 +67,11 @@ export const settings = definePluginSettings({
         default: "",
         restartNeeded: true
     },
+    forceChannelSubscriptionOnStartup: {
+        type: OptionType.BOOLEAN,
+        description: "Force subscription to monitored channels on Vencord startup",
+        default: false
+    },
     IgnoredUsers: {
         type: OptionType.STRING,
         description: "Comma-separated user IDs to ignore",
@@ -102,6 +107,7 @@ export interface JoinerConfig {
     disableAutoJoinAfterSuccess: boolean;
     disableNotificationsAfterSuccess: boolean;
     shiftClickAlsoToggleNotifications: boolean;
+    forceChannelSubscriptionOnStartup: boolean;
     _dev_dedupe_link_cooldown: string; // string que será interpretada como número
 }
 
