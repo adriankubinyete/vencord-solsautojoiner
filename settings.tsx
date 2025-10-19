@@ -129,8 +129,8 @@ export type FullJoinerConfig = JoinerConfig & BiomesConfig;
 export const BiomesKeywords: Record<keyof BiomesConfig, string[]> = {
     GLITCHED: ["glitch", "glitched"],
     DREAMSPACE: ["dream", "dream space", "dreamspace"],
-    BLOODRAIN: ["blood rain", "blood"],
-    PUMPKINMOON: ["pump", "pumpkin", "pumpkin moon"],
+    BLOODRAIN: ["blood rain", "blood", "bloodrain"],
+    PUMPKINMOON: ["pump", "pumpkin", "pumpkin moon", "pmoon", "pumpkinmoon"],
     GRAVEYARD: ["grave", "graveyard", "grave yard"],
     NULL: ["null"],
     CORRUPTION: ["corruption"],

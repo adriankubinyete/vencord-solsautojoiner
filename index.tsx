@@ -93,13 +93,20 @@ export default definePlugin({
                 continue;
             }
 
-            // Checa biomes ativos
+            // check active biomes
             const matchedBiomes = Object.entries(BiomesKeywords)
-                .filter(([biome]) => config[biome as keyof BiomesConfig])
-                .filter(([_, keywords]) => keywords.some(kw => content.includes(kw)))
-                .map(([biome]) => biome);
+            .filter(([biome]) => config[biome as keyof BiomesConfig])
+            .filter(([_, keywords]) =>
+                keywords.some(kw => {
+                    // Garante que só dá match em palavra inteira, case-insensitive
+                    // eslint-disable-next-line @stylistic/quotes
+                    const pattern = new RegExp(`\\b${kw.replace(/\s+/g, '\\s+')}\\b`, "i");
+                    return pattern.test(content);
+                })
+            )
+            .map(([biome]) => biome);
 
-            if (matchedBiomes.length === 0) continue; // found sharelink but no biome keyword matched
+        if (matchedBiomes.length === 0) continue; // found sharelink but no biome keyword matched
 
             console.log(`[SolsAutoJoiner] Link matches active biomes: ${matchedBiomes.join(", ")}`);
 
