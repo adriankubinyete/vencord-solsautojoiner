@@ -41,7 +41,7 @@ You can quickly re-enable it with Shift + Click on the menu button, with a green
 
 ## Installing
 
-For installing instructions, go read [Vencord's "Installing custom plugins" documentation](https://docs.vencord.dev/installing/custom-plugins/)
+For installing instructions, go read [Vencord's "Installing custom plugins" documentation](https://docs.vencord.dev/installing/custom-plugins/)  
 You'll know where to install this repository once you read and understand their guide.
 
 ---
