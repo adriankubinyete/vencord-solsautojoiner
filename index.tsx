@@ -72,136 +72,133 @@ export default definePlugin({
         if (!this.monitoredSet?.has(channelId)) return;
 
         const content: string = (message.content ?? "").toLowerCase();
-        // console.log(`[SolsAutoJoiner] Processing message: "${content}"`);
+        const username = message.author?.username ?? "Unknown User";
+        const userId = message.author?.id ?? "Unknown ID";
 
-        const regex = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/gi;
-        let match: RegExpExecArray | null;
-        let foundAny = false;
+        const extractLinks = (text: string) => {
+            const regex = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/gi;
+            const links: { link: string; code: string }[] = [];
+            let match: RegExpExecArray | null;
+            while ((match = regex.exec(text)) !== null) links.push({ link: match[0], code: match[1] });
+            return links;
+        };
 
-        while ((match = regex.exec(content)) !== null) {
-            foundAny = true;
-            const link = match[0];
-            const code = match[1];
-            console.log(`[SolsAutoJoiner] Found Roblox link: ${link} (code: ${code})`);
-
+        const isOnCooldown = (link: string, code: string) => {
             const now = Date.now();
             const cooldownSeconds = parseInt(config._dev_dedupe_link_cooldown) || 30;
             const lastTime = this.linkTimestamps?.get(link) ?? 0;
-
             if (now - lastTime < cooldownSeconds * 1000) {
-                console.log(`[SolsAutoJoiner] Link deduplication (${now - lastTime}ms), ignoring: ${link}`);
-                continue;
+                console.log(`[SolsAutoJoiner] ⏳ ${code} | Code is on dedupe cooldown (${now - lastTime}ms)`);
+                return true;
             }
+            return false;
+        };
 
-            // check active biomes
-            const matchedBiomes = Object.entries(BiomesKeywords)
-            .filter(([biome]) => config[biome as keyof BiomesConfig])
-            .filter(([_, keywords]) =>
-                keywords.some(kw => {
-                    // Garante que só dá match em palavra inteira, case-insensitive
-                    // eslint-disable-next-line @stylistic/quotes
-                    const pattern = new RegExp(`\\b${kw.replace(/\s+/g, '\\s+')}\\b`, "i");
-                    return pattern.test(content);
-                })
-            )
-            .map(([biome]) => biome);
-
-        if (matchedBiomes.length === 0) continue; // found sharelink but no biome keyword matched
-
-            console.log(`[SolsAutoJoiner] Link matches active biomes: ${matchedBiomes.join(", ")}`);
-
-            // Marca link como processado
+        const markLinkProcessed = (link: string, code: string) => {
+            const now = Date.now();
+            const cooldownSeconds = parseInt(config._dev_dedupe_link_cooldown) || 30;
             this.linkTimestamps?.set(link, now);
             setTimeout(() => {
                 this.linkTimestamps?.delete(link);
-                console.log(`[SolsAutoJoiner] Link cooldown expired, removed: ${link}`);
+                // console.log(`[SolsAutoJoiner] ⏱ ${code} | Dedupe cooldown expired`);
             }, cooldownSeconds * 1000);
+        };
 
+        const matchBiomes = (text: string) => {
+            return Object.entries(BiomesKeywords)
+                .filter(([biome]) => config[biome as keyof BiomesConfig])
+                .filter(([_, keywords]) =>
+                    keywords.some(kw => {
+                        // eslint-disable-next-line
+                        const pattern = new RegExp(`\\b${kw.replace(/\s+/g, '\\s+')}\\b`, "i");
+                        return pattern.test(text);
+                    })
+                )
+                .map(([biome]) => biome);
+        };
+
+        const isIgnoredUser = (id: string) => {
+            if (config.IgnoredUsers.split(",").map(x => x.trim()).includes(id)) {
+                console.log(`[SolsAutoJoiner] 🚫 ${id} | User is in ignore list`);
+                return true;
+            }
+            return false;
+        };
+
+        const sendNotification = (link: string, code: string, biome: string) => {
+            if (!config.Notifications) return;
             const channel = ChannelStore.getChannel(channelId);
-            const guildId = channel?.guild_id;
-            const msgLink = guildId ? `https://discord.com/channels/${guildId}/${channelId}/${message.id}` : "unknown";
+            const channelName = channel?.name ? `#${channel.name}` : `#${channelId}`;
+            const guild = GuildStore.getGuild(message.guild_id);
+            const guildName = guild?.name ?? `Server ${message.guild_id}`;
+            console.log(`[SolsAutoJoiner] 🔔 ${code} | Sending notification for biome ${biome}`);
 
-            console.log(`[SolsAutoJoiner] 🔔 New Roblox share detected! Link: ${msgLink} | Share: ${link} | Biomes: ${matchedBiomes.join(", ")}`);
+            const title = `ℹ️ Link found! - ${biome}`;
+            const body = [
+                `Code: ${code}`,
+                `In channel: ${channelName} (${guildName})`,
+                `Sent by: ${username} (${userId})`
+            ].join("\n");
 
-            const username = message.author?.username ?? "Unknown User";
-            const userId = message.author?.id ?? "Unknown ID";
-
-            if (config.IgnoredUsers.split(",").map(id => id.trim()).includes(userId)) continue; // valid link but user is in ignore list
-            if (matchedBiomes.length > 1) continue; // only one biome per message. if multiple keywords match, skip
-
-            // Desktop Notification
-            if (config.Notifications) {
-                const channel = ChannelStore.getChannel(channelId);
-                const channelName = channel?.name ? `#${channel.name}` : `#${channelId}`;
-
-                const guildId = message.guild_id;
-                const guild = GuildStore.getGuild(guildId);
-                const guildName = guild?.name ?? `Server ${guildId}`;
-
-                const biomeDetected = matchedBiomes.length > 1 ? "Multiple" : matchedBiomes[0];
-
-                const title = `ℹ️ Link found! - ${biomeDetected}`;
-                const body = [
-                    `In channel: ${channelName} (${guildName})`,
-                    `Sent by: ${username} (${userId})`
-                ].join("\n");
-
-                try {
-                    const notif = new Notification(title, { body });
-                    console.log(`[SolsAutoJoiner] Desktop notification sent for link: ${link}`);
-
-                    // captura code e link no closure
-                    const codeCopy = code;
-                    const linkCopy = link;
-
-                    notif.onclick = () => {
-                        console.log(`[SolsAutoJoiner] Notification clicked, opening Roblox link: ${linkCopy}`);
-
-                        // i dont think this is expected behavior: if you click a notif, it shouldnt mess with your settings.
-                        // if you clicked in a notif in the first place your auto join is probably already off. and clicking a notif shouldnt disable other notifs either
-                        // if (config.disableAutoJoinAfterSuccess) {
-                        //     settings.store.AutoJoin = false;
-                        // }
-                        // if (config.disableNotificationsAfterSuccess) {
-                        //     settings.store.Notifications = false;
-                        // }
-
-                        try {
-                            const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
-                            Native.openRoblox(`roblox://navigation/share_links?code=${codeCopy}&type=Server`);
-                        } catch (err) {
-                            console.error("[SolsAutoJoiner] Failed to open Roblox from notification:", err);
-                        }
-                    };
-                } catch (err) {
-                    console.error("[SolsAutoJoiner] Failed to send desktop notification:", err);
-                }
-            }
-
-            // Autojoiner
-            if (config.AutoJoin) {
-                try {
-                    const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
-                    console.log(`[SolsAutoJoiner] Autojoining Roblox server with code: ${code}`);
-                    await Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
-
-                    // Desativa AutoJoin após join automático (se configurado)
-                    if (config.disableAutoJoinAfterSuccess) {
-                        settings.store.AutoJoin = false;
-                        // console.log("[SolsAutoJoiner] AutoJoin disabled after successful join.");
+            try {
+                const notif = new Notification(title, { body });
+                notif.onclick = () => {
+                    // console.log(`[SolsAutoJoiner] 🖱 ${code} | Notification clicked`);
+                    try {
+                        const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
+                        Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
+                    } catch (err) {
+                        console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to open Roblox from notification:`, err);
                     }
-
-                    if (config.disableNotificationsAfterSuccess) {
-                        settings.store.Notifications = false;
-                        // console.log("[SolsAutoJoiner] Notifications disabled after successful join.");
-                    }
-                } catch (err) {
-                    console.error("[SolsAutoJoiner] Failed to autojoin Roblox:", err);
-                }
+                };
+            } catch (err) {
+                console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to send notification`, err);
             }
+        };
+
+        const autoJoin = async (link: string, code: string, biome: string) => {
+            if (!config.AutoJoin) return;
+            try {
+                console.log(`[SolsAutoJoiner] 🚀 ${code} | Autojoining biome ${biome}`);
+                const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
+                await Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
+
+                if (config.disableAutoJoinAfterSuccess) {
+                    settings.store.AutoJoin = false;
+                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | AutoJoin disabled because we completed a join!`);
+                }
+                if (config.disableNotificationsAfterSuccess) {
+                    settings.store.Notifications = false;
+                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | Notifications disabled because we completed a join!`);
+                }
+            } catch (err) {
+                console.error(`[SolsAutoJoiner] ⚠️ ${code} | Autojoin failed:`, err);
+            }
+        };
+
+        // Loop principal
+        for (const { link, code } of extractLinks(content)) {
+            if (isOnCooldown(link, code)) continue;
+            markLinkProcessed(link, code);
+
+            const matchedBiomes = matchBiomes(content);
+            if (matchedBiomes.length === 0) {
+                console.log(`[SolsAutoJoiner] ❌ ${code} | No matching biomes`);
+                continue;
+            }
+            if (matchedBiomes.length > 1) {
+                console.log(`[SolsAutoJoiner] ⚠️ ${code} | Multiple biomes matched: ${matchedBiomes.join(", ")}`);
+                continue;
+            }
+            if (isIgnoredUser(userId)) continue;
+
+            const biome = matchedBiomes[0];
+            console.log(`[SolsAutoJoiner] ✅ ${code} | Valid for biome ${biome}`);
+
+            sendNotification(link, code, biome);
+            await autoJoin(link, code, biome);
         }
-
-        if (!foundAny) console.log("[SolsAutoJoiner] No Roblox links found in message.");
     }
+
 
 });
