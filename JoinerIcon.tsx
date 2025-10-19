@@ -70,7 +70,7 @@ export const JoinerChatBarIcon: ChatBarButtonFactory = ({ isMainChat }) => {
 
         Toasts.show(
             Toasts.create(message, toastType, {
-                duration: 3000,
+                duration: 1000,
                 position: Toasts.Position.BOTTOM,
             })
         );
@@ -86,6 +86,10 @@ export const JoinerChatBarIcon: ChatBarButtonFactory = ({ isMainChat }) => {
                 }
 
                 openModal(props => <JoinerModal rootProps={props} />);
+            }}
+            onContextMenu={e => {
+                e.preventDefault();
+                toggleAutoJoin();
             }}
             buttonProps={{
                 "aria-haspopup": "dialog",
