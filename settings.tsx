@@ -43,8 +43,7 @@ export const settings = definePluginSettings({
     showIcon: {
         type: OptionType.BOOLEAN,
         default: false,
-        description: "Shows an icon for toggling AutoJoin in discord's chat bar",
-        restartNeeded: true,
+        description: "Shows an icon for toggling AutoJoin in discord's chat bar"
     },
     contextMenu: {
         type: OptionType.BOOLEAN,
@@ -75,8 +74,7 @@ export const settings = definePluginSettings({
     IgnoredUsers: {
         type: OptionType.STRING,
         description: "Comma-separated user IDs to ignore",
-        default: "",
-        restartNeeded: true
+        default: ""
     },
     GLITCHED: { type: OptionType.BOOLEAN, description: "", default: false },
     DREAMSPACE: { type: OptionType.BOOLEAN, description: "", default: false },
