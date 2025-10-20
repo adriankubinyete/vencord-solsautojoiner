@@ -114,10 +114,26 @@ export default definePlugin({
         const userId = message.author?.id ?? "Unknown ID";
 
         const extractLinks = (text: string) => {
-            const regex = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/gi;
-            const links: { link: string; code: string; }[] = [];
+            const links: { link: string; code: string; placeId?: string; type: "share" | "private" }[] = [];
+
+            // 🎯 links do tipo share (padrão)
+            const shareRegex = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/gi;
             let match: RegExpExecArray | null;
-            while ((match = regex.exec(text)) !== null) links.push({ link: match[0], code: match[1] });
+            while ((match = shareRegex.exec(text)) !== null) {
+                links.push({ link: match[0], code: match[1], type: "share" });
+            }
+
+            // 🎯 links de private servers
+            const privateRegex = /https?:\/\/(?:www\.)?roblox\.com\/games\/(\d+)\/[^?]+?\?privateServerLinkCode=(\d+)/gi;
+            while ((match = privateRegex.exec(text)) !== null) {
+                links.push({
+                    link: match[0],
+                    placeId: match[1],
+                    code: match[2],
+                    type: "private",
+                });
+            }
+
             return links;
         };
 
@@ -194,13 +210,26 @@ export default definePlugin({
             console.log(`[SolsAutoJoiner] ⏱️ ${code} | sendNotification took ${notifyTime.toFixed(2)}ms`);
         };
 
-        const autoJoin = async (link: string, code: string, biome: string) => {
+        const autoJoin = async (
+            link: string,
+            code: string,
+            biome: string,
+            placeId?: string,
+            type: "share" | "private" = "share"
+        ) => {
             const startJoin = performance.now();
             if (!config.AutoJoin) return;
             try {
-                console.log(`[SolsAutoJoiner] 🚀 ${code} | Autojoining ${biome}`);
+                console.log(`[SolsAutoJoiner] 🚀 ${code} | Autojoining ${biome} (${type})`);
                 const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
-                await Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
+
+                if (type === "private" && placeId) {
+                    // ✅ join private server
+                    await Native.openRoblox(`roblox://placeID=${placeId}&linkCode=${code}`);
+                } else {
+                    // ✅ join normal share link
+                    await Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
+                }
 
                 if (config.disableAutoJoinAfterSuccess) {
                     settings.store.AutoJoin = false;
@@ -222,7 +251,7 @@ export default definePlugin({
         const links = extractLinks(content);
         console.log(`[SolsAutoJoiner] 🧩 Found ${links.length} link(s)`);
 
-        for (const { link, code } of links) {
+        for (const { link, code, placeId, type } of links) {
             const startLoop = performance.now();
 
             if (isOnCooldown(link, code)) continue;
@@ -246,7 +275,7 @@ export default definePlugin({
             console.log(`[SolsAutoJoiner] ✅ ${code} | Biome ${biome} (${biomeTime.toFixed(2)}ms)`);
 
             const shouldNotify = config.Notifications;
-            await autoJoin(link, code, biome);
+            await autoJoin(link, code, biome, placeId, type);
             sendNotification(link, code, biome, shouldNotify);
 
             const loopTime = performance.now() - startLoop;
