@@ -7,7 +7,7 @@
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { Settings } from "@api/Settings";
 import definePlugin from "@utils/types";
-import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu,NavigationRouter, SelectedChannelStore } from "@webpack/common";
+import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu, NavigationRouter, SelectedChannelStore } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
 import { BiomesConfig, BiomesKeywords, FullJoinerConfig, settings } from "./settings";
@@ -115,7 +115,7 @@ export default definePlugin({
 
         const extractLinks = (text: string) => {
             const regex = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/gi;
-            const links: { link: string; code: string }[] = [];
+            const links: { link: string; code: string; }[] = [];
             let match: RegExpExecArray | null;
             while ((match = regex.exec(text)) !== null) links.push({ link: match[0], code: match[1] });
             return links;
@@ -160,9 +160,9 @@ export default definePlugin({
             return false;
         };
 
-        const sendNotification = (link: string, code: string, biome: string) => {
+        const sendNotification = (link: string, code: string, biome: string, shouldNotify: boolean) => {
+            if (!shouldNotify) return;
             const startNotify = performance.now();
-            if (!config.Notifications) return;
             const channel = ChannelStore.getChannel(channelId);
             const channelName = channel?.name ? `#${channel.name}` : `#${channelId}`;
             const guild = GuildStore.getGuild(message.guild_id);
@@ -245,8 +245,9 @@ export default definePlugin({
             const biome = matchedBiomes[0];
             console.log(`[SolsAutoJoiner] ✅ ${code} | Biome ${biome} (${biomeTime.toFixed(2)}ms)`);
 
+            const shouldNotify = config.Notifications;
             await autoJoin(link, code, biome);
-            sendNotification(link, code, biome);
+            sendNotification(link, code, biome, shouldNotify);
 
             const loopTime = performance.now() - startLoop;
             console.log(`[SolsAutoJoiner] ⏲️ ${code} | total loop time ${loopTime.toFixed(2)}ms`);
