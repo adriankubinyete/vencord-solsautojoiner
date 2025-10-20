@@ -66,9 +66,9 @@ export const settings = definePluginSettings({
         default: "",
         restartNeeded: true
     },
-    forceChannelSubscriptionOnStartup: {
+    forceNavigateToMonitoredChannelsOnStartup: {
         type: OptionType.BOOLEAN,
-        description: "Force subscription to monitored channels on Vencord startup",
+        description: "Whenever you start Vencord, it will quickly navigate to each monitored channel to ensure you're subscribed.",
         default: false
     },
     IgnoredUsers: {

@@ -7,7 +7,7 @@
 import { Button } from "@components/Button";
 import { FormSwitch } from "@components/FormSwitch";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
-import { ChannelStore, Forms, MessageStore, Toasts } from "@webpack/common";
+import { ChannelRouter, ChannelStore, Forms, SelectedChannelStore, Toasts } from "@webpack/common";
 
 import { BiomesConfig, settings } from "./settings";
 
@@ -122,6 +122,7 @@ function ForceLoadChannelsButton() {
                 return;
             }
 
+            const currentChannel = SelectedChannelStore.getChannelId();
             let successCount = 0;
 
             for (const channelId of monitored) {
@@ -129,33 +130,27 @@ function ForceLoadChannelsButton() {
                     const channel = ChannelStore.getChannel(channelId);
                     if (!channel) continue;
 
-                    // Try the modern silent subscribe APIs used by clients
-                    if (MessageStore?.startChannel) {
-                        MessageStore.startChannel(channelId);
-                    } else if (MessageStore?.subscribeToChannel) {
-                        MessageStore.subscribeToChannel(channelId);
-                    } else {
-                        // Fallback: attempt a no-op dispatch that some clients accept as "start listening"
-                        // (keep this minimal to avoid loading history)
-                        try {
-                            // @ts-ignore - some clients expose a channel subscription action
-                            const ChannelActions = await import("@webpack/channels");
-                            if (ChannelActions?.joinChannel) ChannelActions.joinChannel(channelId);
-                        } catch {
-                            // ignore fallback errors
-                        }
-                    }
+                    console.log(`[SolsAutoJoiner] Loading channel via navigation: ${channelId}`);
+                    ChannelRouter.transitionToChannel(channelId);
+
+                    // Dá um tempo pra o Discord carregar o canal
+                    await new Promise(res => setTimeout(res, 100));
 
                     successCount++;
                 } catch (err) {
-                    console.warn(`[SolsAutoJoiner] Failed to subscribe to ${channelId}:`, err);
+                    console.warn(`[SolsAutoJoiner] Failed to load channel ${channelId}:`, err);
                 }
+            }
+
+            // Volta pro canal original
+            if (currentChannel) {
+                ChannelRouter.transitionToChannel(currentChannel);
             }
 
             const message =
                 successCount === 0
-                    ? "No monitored channels subscribed."
-                    : `Subscribed to ${successCount} monitored channel${successCount !== 1 ? "s" : ""}.`;
+                    ? "No monitored channels loaded."
+                    : `Loaded ${successCount} monitored channel${successCount !== 1 ? "s" : ""}.`;
 
             const toastType = successCount > 0 ? Toasts.Type.SUCCESS : Toasts.Type.MESSAGE;
 
@@ -166,7 +161,7 @@ function ForceLoadChannelsButton() {
             Toasts.show(toast);
         } catch (err) {
             console.error("[SolsAutoJoiner] Force-load failed:", err);
-            const toast = Toasts.create("Error while subscribing to channels.", Toasts.Type.FAILURE, {
+            const toast = Toasts.create("Error while loading channels.", Toasts.Type.FAILURE, {
                 duration: 2000,
                 position: Toasts.Position.BOTTOM,
             });
@@ -176,7 +171,6 @@ function ForceLoadChannelsButton() {
 
     return (
         <div style={{ marginBottom: 24 }}>
-            {/* Use a plain Button; adjust styles via style/className since Colors/Sizes props aren't present */}
             <Button
                 onClick={handleClick}
                 style={{
@@ -190,11 +184,12 @@ function ForceLoadChannelsButton() {
             </Button>
 
             <Forms.FormText style={{ marginTop: 6, color: "#ccc" }}>
-                Force-subscribes to all monitored channels so new messages are received automatically.
+                Navigates to all monitored channels sequentially to force-load their data, then returns to the original channel.
             </Forms.FormText>
         </div>
     );
 }
+
 
 function BiomeToggle({ biomeKey, label, description }: { biomeKey: keyof BiomesConfig; label: string; description: string; }) {
     const { [biomeKey]: value } = settings.use([biomeKey]);

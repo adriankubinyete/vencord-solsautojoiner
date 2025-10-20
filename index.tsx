@@ -7,7 +7,7 @@
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { Settings } from "@api/Settings";
 import definePlugin from "@utils/types";
-import { ChannelStore, FluxDispatcher, GuildStore, Menu, MessageStore } from "@webpack/common";
+import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu,NavigationRouter, SelectedChannelStore } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
 import { BiomesConfig, BiomesKeywords, FullJoinerConfig, settings } from "./settings";
@@ -50,44 +50,30 @@ export default definePlugin({
     /**
      * Tenta forçar a subscrição nos canais monitorados, sem abrir o histórico.
      */
+
     async forceLoadMonitoredChannels(monitored: Set<string>) {
         if (!monitored.size) return;
 
-        let success = 0;
-        let fail = 0;
+        console.log("[SolsAutoJoiner] Forcing load of monitored channels...");
+
+        // Salva o canal atual pra voltar no final
+        const currentChannel = SelectedChannelStore.getChannelId();
 
         for (const channelId of monitored) {
             try {
-                const channel = ChannelStore.getChannel(channelId);
-                if (!channel) {
-                    console.warn(`[SolsAutoJoiner] ⚠️ Channel ${channelId} not found in ChannelStore.`);
-                    fail++;
-                    continue;
-                }
+                console.log(`[SolsAutoJoiner] Loading channel: ${channelId}`);
+                ChannelRouter.transitionToChannel(channelId);
 
-                if (MessageStore?.startChannel) {
-                    MessageStore.startChannel(channelId);
-                } else if (MessageStore?.subscribeToChannel) {
-                    MessageStore.subscribeToChannel(channelId);
-                } else {
-                    try {
-                        // fallback — tenta importar o módulo de canais
-                        // @ts-ignore
-                        const ChannelActions = await import("@webpack/channels");
-                        if (ChannelActions?.joinChannel) await ChannelActions.joinChannel(channelId);
-                    } catch {
-                        // nada
-                    }
-                }
-
-                success++;
+                // Aguarda um pequeno delay pra dar tempo de carregar o canal
+                await new Promise(res => setTimeout(res, 100));
             } catch (err) {
-                console.error(`[SolsAutoJoiner] ❌ Failed to subscribe to channel ${channelId}:`, err);
-                fail++;
+                console.error(`[SolsAutoJoiner] Failed to load channel ${channelId}:`, err);
             }
         }
 
-        console.log(`[SolsAutoJoiner] ✅ Force-loaded ${success} channels (${fail} failed).`);
+        NavigationRouter.transitionToGuild("@me");
+
+        console.log("[SolsAutoJoiner] Finished preloading monitored channels.");
     },
 
     start() {
@@ -100,7 +86,7 @@ export default definePlugin({
         console.log("[SolsAutoJoiner] Monitoring channels:", Array.from(this.monitoredSet));
 
         // ✅ Force-load channels on startup
-        if (settings.store.forceChannelSubscriptionOnStartup && this.monitoredSet.size > 0) {
+        if (settings.store.forceNavigateToMonitoredChannelsOnStartup && this.monitoredSet.size > 0) {
             this.forceLoadMonitoredChannels(this.monitoredSet)
                 .then(() => console.log("[SolsAutoJoiner] Finished subscribing to monitored channels."))
                 .catch(err => console.error("[SolsAutoJoiner] Error force-loading monitored channels:", err));
