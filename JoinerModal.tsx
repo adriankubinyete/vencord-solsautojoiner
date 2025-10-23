@@ -96,13 +96,33 @@ export function Setting<K extends keyof typeof settings.def>({
             );
             break;
 
-        case OptionType.STRING:
+        // case OptionType.STRING:
+        //     content = (
+        //         <>
+        //             <div style={{ fontWeight: 500, color: "#ccc", marginBottom: 8 }}>{title}</div>
+        //             <CheckedTextInput
+        //                 value={value !== undefined ? String(value) : ""}
+        //                 onChange={v => settings.store[setting] = String(v) as never}
+        //                 validate={() => true}
+        //             />
+        //             {meta.description && (
+        //                 <div style={{ marginTop: 6, color: "#ccc", fontSize: 12 }}>
+        //                     {meta.description}
+        //                 </div>
+        //             )}
+        //         </>
+        //     );
+        //     break;
+        case OptionType.STRING: {
+            const state = settings.use([setting]);
+            const currentValue = state[setting] ?? "" as any;
+
             content = (
                 <>
                     <div style={{ fontWeight: 500, color: "#ccc", marginBottom: 8 }}>{title}</div>
                     <CheckedTextInput
-                        value={value !== undefined ? String(value) : ""}
-                        onChange={v => settings.store[setting] = String(v) as never}
+                        value={currentValue}
+                        onChange={v => (settings.store[setting] = String(v) as never)}
                         validate={() => true}
                     />
                     {meta.description && (
@@ -113,6 +133,7 @@ export function Setting<K extends keyof typeof settings.def>({
                 </>
             );
             break;
+        }
 
         case OptionType.NUMBER:
             content = (

@@ -119,7 +119,7 @@ export default definePlugin({
         const hasPrivate = Boolean(privateMatch);
 
         if (hasShare && hasPrivate) {
-            log.warn("⚠️ Both a share link and a private server link found in the same message — ignoring due to ambiguity.");
+            log.warn("[getLinkFromMessageContent] ⚠️ Both a share link and a private server link found in the same message — ignoring due to ambiguity.");
             return null;
         }
 
@@ -140,7 +140,7 @@ export default definePlugin({
         const lastTime = this.linkCodeTimestamps!.get(code) ?? 0;
         if (now - lastTime < cooldownMs) {
             const remainingCooldown = cooldownMs - (now - lastTime);
-            log.debug(`⏳ Code ${code} is on cooldown. Remaining: ${remainingCooldown}ms`);
+            log.debug(`[isLinkCodeOnCooldown] ⏳ Code ${code} is on cooldown. Remaining: ${remainingCooldown}ms`);
             return true;
         }
         return false;
@@ -152,7 +152,7 @@ export default definePlugin({
     },
 
     isLinkProcessable(link: { link: string; code: string; type: "share" | "private"; placeId?: string }) {
-        // log.info(`Processing link: ${link.code}`);
+        // log.info(`[isLinkProcessable] Processing link: ${link.code}`);
         if (this.isLinkCodeOnCooldown(link.code)) return false;
         this.markLinkCodeAsProcessed(link.code);
         return true;
@@ -179,23 +179,26 @@ export default definePlugin({
         let isSafe = false;
         let joinHappened = false;
 
+        log.debug(`[join] Verification mode: ${verifyMode}}`);
+
         if (verifyMode === "before") {
             const { allowed, message } = await this.isSafeLink(link);
             if (!allowed) {
-                log.warn(`⚠️ Link verification (before) failed: ${message}`);
+                log.warn(`[join] ⚠️ Link verification (before) failed: ${message}`);
                 return { isSafe, joinHappened };
             }
             isSafe = true;
         }
 
+        log.warn(`[join] Joining link: ${link.link}`);
         await this.openRoblox(link);
         joinHappened = true;
 
         if (verifyMode === "after") {
             const { allowed, message } = await this.isSafeLink(link);
             if (!allowed) {
-                log.warn(`⚠️ Link verification (after) failed: ${message}`);
-                log.info(`Waiting ${fallbackActionDelayMs}ms before fallback action...`);
+                log.warn(`[join] ⚠️ Link verification (after) failed: ${message}`);
+                log.info(`[join] Waiting ${fallbackActionDelayMs}ms before fallback action...`);
                 await new Promise(res => setTimeout(res, fallbackActionDelayMs));
                 await this.openRoblox({ type: "public", placeId: "15532962292" });
                 return { isSafe, joinHappened };
@@ -212,7 +215,7 @@ export default definePlugin({
         };
 
         if (!link?.type) {
-            log.error("❌ openRoblox: Missing link type.");
+            log.error("[openRoblox] ❌ Missing link type.");
             return;
         }
 
@@ -221,7 +224,7 @@ export default definePlugin({
         switch (link.type) {
             case "public":
                 if (!link.placeId) {
-                    log.error("❌ openRoblox: Missing placeId for public link.");
+                    log.error("[openRoblox] ❌ Missing placeId for public link.");
                     return;
                 }
                 uri = `roblox://placeID=${link.placeId}`;
@@ -229,7 +232,7 @@ export default definePlugin({
 
             case "share":
                 if (!link.code) {
-                    log.error("❌ openRoblox: Missing share code.");
+                    log.error("[openRoblox] ❌ Missing share code.");
                     return;
                 }
                 uri = `roblox://navigation/share_links?code=${link.code}&type=Server`;
@@ -237,7 +240,7 @@ export default definePlugin({
 
             case "private":
                 if (!link.placeId || !link.code) {
-                    log.error("❌ openRoblox: Missing placeId or linkCode for private link.");
+                    log.error("[openRoblox] ❌ Missing placeId or linkCode for private link.");
                     return;
                 }
                 uri = `roblox://placeID=${link.placeId}&linkCode=${link.code}`;
@@ -245,24 +248,24 @@ export default definePlugin({
         }
 
         if (!uri) {
-            log.error("❌ openRoblox: Failed to construct URI.");
+            log.error("[openRoblox] ❌ Failed to construct URI.");
             return;
         }
 
         try {
             Native.openRoblox(uri);
         } catch (err) {
-            log.error("⚠️ Failed to open Roblox link:", err);
+            log.error("[openRoblox] ⚠️ Failed to open Roblox link:", err);
         }
     },
 
     async resolveShareCode(shareCode: string): Promise<{ placeId: string } | undefined> {
         try {
-            log.debug(`Resolving share code ${shareCode}`);
+            log.debug(`[resolveShareCode] Resolving share code ${shareCode}`);
 
             const token = this.config!.verifyRoblosecurityToken;
             if (!token) {
-                log.warn("No .ROBLOSECURITY token set.");
+                log.warn("[resolveShareCode] No .ROBLOSECURITY token set.");
                 return undefined;
             }
 
@@ -275,44 +278,46 @@ export default definePlugin({
             // 1️⃣ Busca CSRF token
             const { status: csrfStatus, csrf } = await Native.fetchRobloxCsrf(token);
             // status 403 expected
-            log.debug(`[CSRF] Status: ${csrfStatus} || "null"}`);
+            log.debug(`[resolveShareCode] CSRF - Status: ${csrfStatus || null}`);
 
             if (!csrf) {
-                log.warn(`Failed to fetch CSRF token for share code ${shareCode}`);
+                log.warn(`[resolveShareCode] Failed to fetch CSRF token for share code ${shareCode}`);
                 return undefined;
             }
 
             // 2️⃣ Resolve o share link usando o CSRF
             const { status, data } = await Native.resolveRobloxShareLink(token, csrf, shareCode);
-            log.debug(`[ResolveShareLink] Status: ${status}, Data:`, data);
+            log.debug(`[resolveShareCode]  Status: ${status}, Data:`, data);
 
             if (!data || status !== 200) {
-                log.error(`[ResolveShareLink] Failed to resolve share code ${shareCode}`);
-                log.error(`[ResolveShareLink] ${data}}`);
+                log.error(`[resolveShareCode]  Failed to resolve share code ${shareCode}`);
+                log.error(`[resolveShareCode]  ${data}}`);
                 // if the word "auth" is mentioned in the error, it probably means we need a new token
                 if (data?.includes("auth")) {
-                    log.warn("⚠️ Your .ROBLOSECURITY token is probably expired. Try setting a new one.");
+                    log.warn("[resolveShareCode] ⚠️ Your .ROBLOSECURITY token is probably expired. Try setting a new one.");
+                    this.sendNotification("⚠️ Your .ROBLOSECURITY token is probably expired.", "Try setting a new one for SolsAutoJoiner to continue validating your links, or disable link validation.");
                 }
                 return undefined;
             }
 
             const serverData = data?.privateServerInviteData;
-            log.debug("[ServerData]", serverData);
+            log.debug("[resolveShareCode] server data:", serverData);
 
             if (serverData?.status !== "Valid") {
-                log.warn(`Share code ${shareCode} is not valid.`);
+                log.warn(`[resolveShareCode] Share code ${shareCode} is not valid.`);
                 return undefined;
             }
 
-            log.info(`Share code ${shareCode} resolved successfully: placeId=${serverData.placeId}`);
-            return { placeId: serverData.placeId };
+            log.info(`[resolveShareCode] Share code ${shareCode} resolved successfully: placeId=${serverData.placeId}`);
+            const stringifiedPlaceId = serverData.placeId.toString();
+            return { placeId: stringifiedPlaceId };
         } catch (err) {
-            log.error(`Error resolving share code ${shareCode}:`, err);
+            log.error(`[resolveShareCode] Error resolving share code ${shareCode}:`, err);
             return undefined;
         }
     },
 
-    async isSafeLink(link: { link: string; type: "share" | "private"; code: string; placeId?: string; }): Promise<{ allowed: boolean; message: string; }> {
+    async isSafeLink(link: { link: string; type: "share" | "private" | "public"; code: string; placeId?: string; }): Promise<{ allowed: boolean; message: string; }> {
         let { placeId } = link;
 
         // --- PRIVATE SERVER LINKS ---
@@ -337,6 +342,9 @@ export default definePlugin({
             const resolved = await this.resolveShareCode(link.code);
             placeId = resolved?.placeId;
 
+            log.warn(`Resolved PlaceId: ${placeId}`);
+            log.warn(`Type of resolved placeid: ${typeof placeId}`);
+
             if (!placeId) {
                 return { allowed: false, message: "Failed to resolve placeId from share link." };
             }
@@ -357,15 +365,17 @@ export default definePlugin({
     },
 
     isAllowedPlaceId(placeId: string): boolean {
+        const normalized = placeId.toString().toLowerCase().trim();
         const allowedIds = this.config!.verifyAllowedPlaceIds.split(",").map(id => id.trim()).filter(Boolean);
         if (allowedIds.length === 0) return true;
-        return allowedIds.includes(placeId);
+        return allowedIds.includes(normalized);
     },
 
     isBlockedPlaceId(placeId: string): boolean {
+        const normalized = placeId.toString().toLowerCase().trim();
         const blockedIds = this.config!.verifyBlockedPlaceIds.split(",").map(id => id.trim()).filter(Boolean);
         if (blockedIds.length === 0) return false;
-        return blockedIds.includes(placeId);
+        return blockedIds.includes(normalized);
     },
 
 
