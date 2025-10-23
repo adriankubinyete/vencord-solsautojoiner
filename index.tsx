@@ -5,6 +5,7 @@
  */
 
 import { Settings } from "@api/Settings";
+import { copyToClipboard } from "@utils/clipboard";
 import definePlugin from "@utils/types";
 import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, NavigationRouter } from "@webpack/common";
 
@@ -151,7 +152,7 @@ export default definePlugin({
         this.linkCodeTimestamps!.set(code, now);
     },
 
-    isLinkProcessable(link: { link: string; code: string; type: "share" | "private"; placeId?: string }) {
+    isLinkProcessable(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }) {
         // log.info(`[isLinkProcessable] Processing link: ${link.code}`);
         if (this.isLinkCodeOnCooldown(link.code)) return false;
         this.markLinkCodeAsProcessed(link.code);
@@ -211,7 +212,7 @@ export default definePlugin({
 
     async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }) {
         const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
-            openRoblox: (uri: string) => void;
+            openRoblox: (uri: string) => Promise<void>;
         };
 
         if (!link?.type) {
@@ -253,13 +254,14 @@ export default definePlugin({
         }
 
         try {
-            Native.openRoblox(uri);
+            await Native.openRoblox(uri);
+            log.debug("[openRoblox] Roblox process spawned successfully.");
         } catch (err) {
             log.error("[openRoblox] ⚠️ Failed to open Roblox link:", err);
         }
     },
 
-    async resolveShareCode(shareCode: string): Promise<{ placeId: string } | undefined> {
+    async resolveShareCode(shareCode: string): Promise<{ placeId: string; } | undefined> {
         try {
             log.debug(`[resolveShareCode] Resolving share code ${shareCode}`);
 
@@ -271,8 +273,8 @@ export default definePlugin({
 
             // Pega o Native do plugin
             const Native = VencordNative.pluginHelpers.SolsAutoJoiner as {
-                fetchRobloxCsrf: (token: string) => Promise<{ status: number; csrf: string | null }>;
-                resolveRobloxShareLink: (token: string, csrf: string, shareCode: string) => Promise<{ status: number; data: any }>;
+                fetchRobloxCsrf: (token: string) => Promise<{ status: number; csrf: string | null; }>;
+                resolveRobloxShareLink: (token: string, csrf: string, shareCode: string) => Promise<{ status: number; data: any; }>;
             };
 
             // 1️⃣ Busca CSRF token
@@ -436,13 +438,13 @@ export default definePlugin({
             if (joinHappened && !isSafe) {
                 const title = "⚠️ SAJ :: Bad server!";
                 const body = [
-                    "The link you just tried to join was unsafe. You have been moved to a safe server. Click on this notification to jump to the bad message.",
+                    "The link you just tried to join was unsafe. You have been moved to a safe server. Click on this notification to copy the message link.",
                     `In channel: ${channelName} (${guildName})`,
                     `Sent by: ${authorUsername} (${authorId})`
                 ].join("\n");
-                const onClick = () => {
+                const onClick = async () => {
                     const messageUrl = `https://discord.com/channels/${ChannelStore.getChannel(channelId)?.guild_id}/${channelId}/${message.id}`;
-                    window.open(messageUrl, "_blank");
+                    await copyToClipboard(messageUrl);
                 };
                 this.sendNotification(title, body, onClick);
                 return;
