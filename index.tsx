@@ -4,32 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { Settings } from "@api/Settings";
 import definePlugin from "@utils/types";
-import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu, NavigationRouter, SelectedChannelStore } from "@webpack/common";
+import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, NavigationRouter } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
-import { BiomesConfig, BiomesKeywords, FullJoinerConfig, settings } from "./settings";
+import { BiomeSettings, BiomesKeywords, JoinerSettings, settings } from "./settings";
+import { createLogger } from "./utils";
 
-// Patch pro ContextMenu
-const ChatBarContextCheckbox: NavContextMenuPatchCallback = children => {
-    const { AutoJoin: isEnabled, contextMenu } = settings.use(["AutoJoin", "contextMenu"]);
-    if (!contextMenu) return;
-
-    const group = findGroupChildrenByChildId("submit-button", children);
-    if (!group) return;
-
-    const idx = group.findIndex(c => c?.props?.id === "submit-button");
-    group.splice(idx + 1, 0,
-        <Menu.MenuCheckboxItem
-            id="vc-autojoin-toggle"
-            label="Enable AutoJoin"
-            checked={isEnabled}
-            action={() => settings.store.AutoJoin = !settings.store.AutoJoin}
-        />
-    );
-};
+const log = createLogger("[SolsAutoJoiner]", true);
 
 export default definePlugin({
     name: "SolsAutoJoiner",
@@ -37,252 +20,465 @@ export default definePlugin({
     authors: [{ name: "masutty", id: 188851299255713792n }],
     settings,
 
-    contextMenus: {
-        "textarea-context": ChatBarContextCheckbox,
-    },
-
     renderChatBarButton: JoinerChatBarIcon,
 
     boundHandler: null as ((data: any) => void) | null,
     monitoredSet: null as Set<string> | null,
-    linkTimestamps: null as Map<string, number> | null,
+    linkCodeTimestamps: null as Map<string, number> | null,
+    config: null as JoinerSettings | null,
 
     /**
      * Tenta forçar a subscrição nos canais monitorados, sem abrir o histórico.
      */
 
-    async forceLoadMonitoredChannels(monitored: Set<string>) {
+    async preloadMonitoredChannels(monitored: Set<string>) {
         if (!monitored.size) return;
-
-        console.log("[SolsAutoJoiner] Forcing load of monitored channels...");
-
-        // Salva o canal atual pra voltar no final
-        const currentChannel = SelectedChannelStore.getChannelId();
 
         for (const channelId of monitored) {
             try {
-                console.log(`[SolsAutoJoiner] Loading channel: ${channelId}`);
+                log.trace(`Loading channel ${channelId}`);
                 ChannelRouter.transitionToChannel(channelId);
 
-                // Aguarda um pequeno delay pra dar tempo de carregar o canal
+                // wait a bit to let the channel load
                 await new Promise(res => setTimeout(res, 100));
             } catch (err) {
-                console.error(`[SolsAutoJoiner] Failed to load channel ${channelId}:`, err);
+                log.error(`Failed to load channel ${channelId}:`, err);
             }
         }
 
         NavigationRouter.transitionToGuild("@me");
-
-        console.log("[SolsAutoJoiner] Finished preloading monitored channels.");
     },
 
     start() {
-        const config = Settings.plugins.SolsAutoJoiner as unknown as FullJoinerConfig;
-        this.monitoredSet = new Set(config.MonitoredChannels.split(",").map(id => id.trim()).filter(Boolean));
-        this.linkTimestamps = new Map();
+        // Carrega a configuração do plugin
+        const config = Settings.plugins.SolsAutoJoiner as unknown as JoinerSettings;
+        this.config = config;
+
+        // Inicializa o Set de canais monitorados
+        this.monitoredSet = new Set(
+            config.monitorChannelList
+                .split(",")
+                .map(id => id.trim())
+                .filter(Boolean)
+        );
+
+        // Inicializa o Map para deduplicação de links
+        this.linkCodeTimestamps = new Map();
+
+        // Bind do handler de novas mensagens
         this.boundHandler = this.handleNewMessage.bind(this);
         FluxDispatcher.subscribe("MESSAGE_CREATE", this.boundHandler);
 
-        console.log("[SolsAutoJoiner] Monitoring channels:", Array.from(this.monitoredSet));
-
-        // ✅ Force-load channels on startup
-        if (settings.store.forceNavigateToMonitoredChannelsOnStartup && this.monitoredSet.size > 0) {
-            this.forceLoadMonitoredChannels(this.monitoredSet)
-                .then(() => console.log("[SolsAutoJoiner] Finished subscribing to monitored channels."))
-                .catch(err => console.error("[SolsAutoJoiner] Error force-loading monitored channels:", err));
+        // Force-load channels on startup, se configurado
+        if (config.monitorNavigateToChannelsOnStartup && this.monitoredSet.size > 0) {
+            this.preloadMonitoredChannels(this.monitoredSet)
+                .then(() => log.info("Finished force-loading monitored channels"))
+                .catch(err => log.error("Error force-loading monitored channels:", err));
         }
     },
 
     stop() {
         if (this.boundHandler) FluxDispatcher.unsubscribe("MESSAGE_CREATE", this.boundHandler);
         this.boundHandler = null;
+        this.config = null;
+
+        this.linkCodeTimestamps?.clear();
+        this.linkCodeTimestamps = null;
+
+        this.monitoredSet?.clear();
         this.monitoredSet = null;
-        this.linkTimestamps?.clear();
-        this.linkTimestamps = null;
-        console.log("[SolsAutoJoiner] Stopped monitoring.");
+
+        log.info("Stopped.");
     },
 
-    async handleNewMessage(data: { channelId: string; message: any; }) {
-        const startAll = performance.now();
+    /*
+    * Helpers
+    */
 
-        const { channelId, message } = data;
-        const config = Settings.plugins.SolsAutoJoiner as unknown as FullJoinerConfig;
-        if (!this.monitoredSet?.has(channelId)) return;
+    channelIsBeingMonitored(channelId: string) {
+        const monitoredChannelsSet = new Set(this.config!.monitorChannelList.split(",").map(id => id.trim()).filter(Boolean));
+        return monitoredChannelsSet?.has(channelId);
+    },
 
-        const content: string = (message.content ?? "").toLowerCase();
-        const username = message.author?.username ?? "Unknown User";
-        const userId = message.author?.id ?? "Unknown ID";
+    userIsBlocked(userId: string) {
+        return this.config!.monitorBlockedUserList.split(",").map(x => x.trim()).includes(userId);
+    },
 
-        const extractLinks = (text: string) => {
-            const links: { link: string; code: string; placeId?: string; type: "share" | "private" }[] = [];
+    getLinkFromMessageContent(content: string) {
+        if (!content?.trim()) return null;
 
-            // 🎯 links do tipo share (padrão)
-            const shareRegex = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/gi;
-            let match: RegExpExecArray | null;
-            while ((match = shareRegex.exec(text)) !== null) {
-                links.push({ link: match[0], code: match[1], type: "share" });
-            }
+        const normalized = content.toLowerCase();
 
-            // 🎯 links de private servers
-            const privateRegex = /https?:\/\/(?:www\.)?roblox\.com\/games\/(\d+)\/[^?]+?\?privateServerLinkCode=(\d+)/gi;
-            while ((match = privateRegex.exec(text)) !== null) {
-                links.push({
-                    link: match[0],
-                    placeId: match[1],
-                    code: match[2],
-                    type: "private",
-                });
-            }
+        const shareMatch = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/i.exec(normalized);
+        const privateMatch = /https?:\/\/(?:www\.)?roblox\.com\/games\/(\d+)(?:\/[^?]*)?\?privateserverlinkcode=([a-f0-9]+)/i.exec(normalized);
 
-            return links;
-        };
+        // https://www.roblox.com/games/15532962292?privateServerLinkCode=10797789767819061560477789923716
+        // placeid = 15532962292
 
-        const isOnCooldown = (link: string, code: string) => {
-            const now = Date.now();
-            const cooldownSeconds = parseInt(config._dev_dedupe_link_cooldown) || 30;
-            const lastTime = this.linkTimestamps?.get(link) ?? 0;
-            if (now - lastTime < cooldownSeconds * 1000) {
-                console.log(`[SolsAutoJoiner] ⏳ ${code} | Dedupe cooldown (${now - lastTime}ms)`);
-                return true;
-            }
-            return false;
-        };
+        const hasShare = Boolean(shareMatch);
+        const hasPrivate = Boolean(privateMatch);
 
-        const markLinkProcessed = (link: string) => {
-            const now = Date.now();
-            const cooldownSeconds = parseInt(config._dev_dedupe_link_cooldown) || 30;
-            this.linkTimestamps?.set(link, now);
-            setTimeout(() => this.linkTimestamps?.delete(link), cooldownSeconds * 1000);
-        };
-
-        const matchBiomes = (text: string) => {
-            return Object.entries(BiomesKeywords)
-                .filter(([biome]) => config[biome as keyof BiomesConfig])
-                .filter(([_, keywords]) =>
-                    keywords.some(kw => {
-                        // eslint-disable-next-line @stylistic/quotes
-                        const pattern = new RegExp(`\\b${kw.replace(/\s+/g, '\\s+')}\\b`, "i");
-                        return pattern.test(text);
-                    })
-                )
-                .map(([biome]) => biome);
-        };
-
-        const isIgnoredUser = (id: string) => {
-            if (config.IgnoredUsers.split(",").map(x => x.trim()).includes(id)) {
-                console.log(`[SolsAutoJoiner] 🚫 ${id} | Ignored user`);
-                return true;
-            }
-            return false;
-        };
-
-        const sendNotification = (link: string, code: string, biome: string, shouldNotify: boolean) => {
-            if (!shouldNotify) return;
-            const startNotify = performance.now();
-            const channel = ChannelStore.getChannel(channelId);
-            const channelName = channel?.name ? `#${channel.name}` : `#${channelId}`;
-            const guild = GuildStore.getGuild(message.guild_id);
-            const guildName = guild?.name ?? `Server ${message.guild_id}`;
-            console.log(`[SolsAutoJoiner] 🔔 ${code} | Sending notification for biome ${biome}`);
-
-            const title = `ℹ️ Link found! - ${biome}`;
-            const body = [
-                `Server: ${code}`,
-                `In channel: ${channelName} (${guildName})`,
-                `Sent by: ${username} (${userId})`
-            ].join("\n");
-
-            try {
-                const notif = new Notification(title, { body });
-                notif.onclick = () => {
-                    try {
-                        const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
-                        Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
-                    } catch (err) {
-                        console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to open Roblox from notif:`, err);
-                    }
-                };
-            } catch (err) {
-                console.error(`[SolsAutoJoiner] ⚠️ ${code} | Failed to send notif`, err);
-            }
-
-            const notifyTime = performance.now() - startNotify;
-            console.log(`[SolsAutoJoiner] ⏱️ ${code} | sendNotification took ${notifyTime.toFixed(2)}ms`);
-        };
-
-        const autoJoin = async (
-            link: string,
-            code: string,
-            biome: string,
-            placeId?: string,
-            type: "share" | "private" = "share"
-        ) => {
-            const startJoin = performance.now();
-            if (!config.AutoJoin) return;
-            try {
-                console.log(`[SolsAutoJoiner] 🚀 ${code} | Autojoining ${biome} (${type})`);
-                const Native = VencordNative.pluginHelpers.SolsAutoJoiner as unknown as { openRoblox: (uri: string) => void; };
-
-                if (type === "private" && placeId) {
-                    // ✅ join private server
-                    await Native.openRoblox(`roblox://placeID=${placeId}&linkCode=${code}`);
-                } else {
-                    // ✅ join normal share link
-                    await Native.openRoblox(`roblox://navigation/share_links?code=${code}&type=Server`);
-                }
-
-                if (config.disableAutoJoinAfterSuccess) {
-                    settings.store.AutoJoin = false;
-                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | AutoJoin disabled`);
-                }
-                if (config.disableNotificationsAfterSuccess) {
-                    settings.store.Notifications = false;
-                    console.log(`[SolsAutoJoiner] ℹ️ ${code} | Notifications disabled`);
-                }
-            } catch (err) {
-                console.error(`[SolsAutoJoiner] ⚠️ ${code} | Autojoin failed:`, err);
-            }
-            const joinTime = performance.now() - startJoin;
-            console.log(`[SolsAutoJoiner] ⏱️ ${code} | autoJoin took ${joinTime.toFixed(2)}ms`);
-        };
-
-        // Loop principal com métricas
-        const loopStart = performance.now();
-        const links = extractLinks(content);
-        console.log(`[SolsAutoJoiner] 🧩 Found ${links.length} link(s)`);
-
-        for (const { link, code, placeId, type } of links) {
-            const startLoop = performance.now();
-
-            if (isOnCooldown(link, code)) continue;
-            markLinkProcessed(link);
-
-            const biomeStart = performance.now();
-            const matchedBiomes = matchBiomes(content);
-            const biomeTime = performance.now() - biomeStart;
-
-            if (matchedBiomes.length === 0) {
-                console.log(`[SolsAutoJoiner] ❌ ${code} | No biomes (${biomeTime.toFixed(2)}ms)`);
-                continue;
-            }
-            if (matchedBiomes.length > 1) {
-                console.log(`[SolsAutoJoiner] ⚠️ ${code} | Multiple biomes: ${matchedBiomes.join(", ")} (${biomeTime.toFixed(2)}ms)`);
-                continue;
-            }
-            if (isIgnoredUser(userId)) continue;
-
-            const biome = matchedBiomes[0];
-            console.log(`[SolsAutoJoiner] ✅ ${code} | Biome ${biome} (${biomeTime.toFixed(2)}ms)`);
-
-            const shouldNotify = config.Notifications;
-            await autoJoin(link, code, biome, placeId, type);
-            sendNotification(link, code, biome, shouldNotify);
-
-            const loopTime = performance.now() - startLoop;
-            console.log(`[SolsAutoJoiner] ⏲️ ${code} | total loop time ${loopTime.toFixed(2)}ms`);
+        if (hasShare && hasPrivate) {
+            log.warn("⚠️ Both a share link and a private server link found in the same message — ignoring due to ambiguity.");
+            return null;
         }
 
-        const totalTime = performance.now() - startAll;
-        console.log(`[SolsAutoJoiner] 🕒 Message processed in ${totalTime.toFixed(2)}ms`);
-    }
+        const match = shareMatch ?? privateMatch;
+        if (!match) return null;
+
+        return {
+            type: hasShare ? "share" as const : "private" as const,
+            link: match[0],
+            code: hasShare ? match[1] : match[2],
+            placeid: hasPrivate ? match[1] : undefined
+        };
+    },
+
+    isLinkCodeOnCooldown(code: string): boolean {
+        const now = Date.now();
+        const cooldownMs = this.config!._dev_dedupe_link_cooldown_ms || 10000;
+        const lastTime = this.linkCodeTimestamps!.get(code) ?? 0;
+        if (now - lastTime < cooldownMs) {
+            const remainingCooldown = cooldownMs - (now - lastTime);
+            log.debug(`⏳ Code ${code} is on cooldown. Remaining: ${remainingCooldown}ms`);
+            return true;
+        }
+        return false;
+    },
+
+    markLinkCodeAsProcessed(code: string) {
+        const now = Date.now();
+        this.linkCodeTimestamps!.set(code, now);
+    },
+
+    isLinkProcessable(link: { link: string; code: string; type: "share" | "private"; placeId?: string }) {
+        // log.info(`Processing link: ${link.code}`);
+        if (this.isLinkCodeOnCooldown(link.code)) return false;
+        this.markLinkCodeAsProcessed(link.code);
+        return true;
+    },
+
+    detectBiomeKeywords(text: string): string[] {
+        const normalized = text.toLowerCase();
+        return Object.entries(BiomesKeywords)
+            .filter(([biome]) => this.config![biome as keyof BiomeSettings])
+            .filter(([_, keywords]) =>
+                keywords.some(kw => {
+                    // eslint-disable-next-line @stylistic/quotes
+                    const pattern = new RegExp(`\\b${kw.replace(/\s+/g, '\\s+')}\\b`, "i");
+                    return pattern.test(normalized);
+                })
+            )
+            .map(([biome]) => biome);
+    },
+
+    // true if join was successful, false otherwise (currently means join is unsafe)
+    async join(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
+        const verifyMode = this.config!.verifyMode || "none";
+        const fallbackActionDelayMs = this.config!._dev_verification_fail_fallback_delay_ms || 5000;
+        let isSafe = false;
+        let joinHappened = false;
+
+        if (verifyMode === "before") {
+            const { allowed, message } = await this.isSafeLink(link);
+            if (!allowed) {
+                log.warn(`⚠️ Link verification (before) failed: ${message}`);
+                return { isSafe, joinHappened };
+            }
+            isSafe = true;
+        }
+
+        await this.openRoblox(link);
+        joinHappened = true;
+
+        if (verifyMode === "after") {
+            const { allowed, message } = await this.isSafeLink(link);
+            if (!allowed) {
+                log.warn(`⚠️ Link verification (after) failed: ${message}`);
+                log.info(`Waiting ${fallbackActionDelayMs}ms before fallback action...`);
+                await new Promise(res => setTimeout(res, fallbackActionDelayMs));
+                await this.openRoblox({ type: "public", placeId: "15532962292" });
+                return { isSafe, joinHappened };
+            }
+            isSafe = true;
+        }
+
+        return { isSafe, joinHappened };
+    },
+
+    async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }) {
+        const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
+            openRoblox: (uri: string) => void;
+        };
+
+        if (!link?.type) {
+            log.error("❌ openRoblox: Missing link type.");
+            return;
+        }
+
+        let uri: string | null = null;
+
+        switch (link.type) {
+            case "public":
+                if (!link.placeId) {
+                    log.error("❌ openRoblox: Missing placeId for public link.");
+                    return;
+                }
+                uri = `roblox://placeID=${link.placeId}`;
+                break;
+
+            case "share":
+                if (!link.code) {
+                    log.error("❌ openRoblox: Missing share code.");
+                    return;
+                }
+                uri = `roblox://navigation/share_links?code=${link.code}&type=Server`;
+                break;
+
+            case "private":
+                if (!link.placeId || !link.code) {
+                    log.error("❌ openRoblox: Missing placeId or linkCode for private link.");
+                    return;
+                }
+                uri = `roblox://placeID=${link.placeId}&linkCode=${link.code}`;
+                break;
+        }
+
+        if (!uri) {
+            log.error("❌ openRoblox: Failed to construct URI.");
+            return;
+        }
+
+        try {
+            Native.openRoblox(uri);
+        } catch (err) {
+            log.error("⚠️ Failed to open Roblox link:", err);
+        }
+    },
+
+    async resolveShareCode(shareCode: string): Promise<{ placeId: string } | undefined> {
+        try {
+            log.debug(`Resolving share code ${shareCode}`);
+
+            const token = this.config!.verifyRoblosecurityToken;
+            if (!token) {
+                log.warn("No .ROBLOSECURITY token set.");
+                return undefined;
+            }
+
+            // Pega o Native do plugin
+            const Native = VencordNative.pluginHelpers.SolsAutoJoiner as {
+                fetchRobloxCsrf: (token: string) => Promise<{ status: number; csrf: string | null }>;
+                resolveRobloxShareLink: (token: string, csrf: string, shareCode: string) => Promise<{ status: number; data: any }>;
+            };
+
+            // 1️⃣ Busca CSRF token
+            const { status: csrfStatus, csrf } = await Native.fetchRobloxCsrf(token);
+            // status 403 expected
+            log.debug(`[CSRF] Status: ${csrfStatus} || "null"}`);
+
+            if (!csrf) {
+                log.warn(`Failed to fetch CSRF token for share code ${shareCode}`);
+                return undefined;
+            }
+
+            // 2️⃣ Resolve o share link usando o CSRF
+            const { status, data } = await Native.resolveRobloxShareLink(token, csrf, shareCode);
+            log.debug(`[ResolveShareLink] Status: ${status}, Data:`, data);
+
+            if (!data || status !== 200) {
+                log.error(`[ResolveShareLink] Failed to resolve share code ${shareCode}`);
+                log.error(`[ResolveShareLink] ${data}}`);
+                // if the word "auth" is mentioned in the error, it probably means we need a new token
+                if (data?.includes("auth")) {
+                    log.warn("⚠️ Your .ROBLOSECURITY token is probably expired. Try setting a new one.");
+                }
+                return undefined;
+            }
+
+            const serverData = data?.privateServerInviteData;
+            log.debug("[ServerData]", serverData);
+
+            if (serverData?.status !== "Valid") {
+                log.warn(`Share code ${shareCode} is not valid.`);
+                return undefined;
+            }
+
+            log.info(`Share code ${shareCode} resolved successfully: placeId=${serverData.placeId}`);
+            return { placeId: serverData.placeId };
+        } catch (err) {
+            log.error(`Error resolving share code ${shareCode}:`, err);
+            return undefined;
+        }
+    },
+
+    async isSafeLink(link: { link: string; type: "share" | "private"; code: string; placeId?: string; }): Promise<{ allowed: boolean; message: string; }> {
+        let { placeId } = link;
+
+        // --- PRIVATE SERVER LINKS ---
+        if (link.type === "private") {
+            if (!placeId) {
+                return { allowed: false, message: "No placeId found in private server link." };
+            }
+
+            if (this.isBlockedPlaceId(placeId)) {
+                return { allowed: false, message: `PlaceId ${placeId} is blocked.` };
+            }
+
+            if (!this.isAllowedPlaceId(placeId)) {
+                return { allowed: false, message: `PlaceId ${placeId} is not in the allowed list.` };
+            }
+
+            return { allowed: true, message: "Private link is allowed." };
+        }
+
+        // --- SHARE LINKS ---
+        if (link.type === "share") {
+            const resolved = await this.resolveShareCode(link.code);
+            placeId = resolved?.placeId;
+
+            if (!placeId) {
+                return { allowed: false, message: "Failed to resolve placeId from share link." };
+            }
+
+            if (this.isBlockedPlaceId(placeId)) {
+                return { allowed: false, message: `PlaceId ${placeId} is blocked.` };
+            }
+
+            if (!this.isAllowedPlaceId(placeId)) {
+                return { allowed: false, message: `PlaceId ${placeId} is not in the allowed list.` };
+            }
+
+            return { allowed: true, message: "Share link is allowed." };
+        }
+
+        // --- UNKNOWN TYPE ---
+        return { allowed: false, message: "Unknown link type." };
+    },
+
+    isAllowedPlaceId(placeId: string): boolean {
+        const allowedIds = this.config!.verifyAllowedPlaceIds.split(",").map(id => id.trim()).filter(Boolean);
+        if (allowedIds.length === 0) return true;
+        return allowedIds.includes(placeId);
+    },
+
+    isBlockedPlaceId(placeId: string): boolean {
+        const blockedIds = this.config!.verifyBlockedPlaceIds.split(",").map(id => id.trim()).filter(Boolean);
+        if (blockedIds.length === 0) return false;
+        return blockedIds.includes(placeId);
+    },
+
+
+    /*
+    * Message Handler
+    */
+
+    async handleNewMessage(data: { channelId: string; message: any; }) {
+        const msgStartTime = performance.now();
+
+        // Is it a valid message?
+        const { channelId, message } = data;
+        const authorId = message.author?.id ?? "Unknown ID";
+        if (!this.channelIsBeingMonitored(channelId)) return;
+        if (this.userIsBlocked(authorId)) return;
+
+        const content: string = (message.content ?? "");
+        const authorUsername = message.author?.username ?? "Unknown User";
+        const channelName = ChannelStore.getChannel(channelId)?.name ?? "Unknown Channel";
+        const guildName = GuildStore.getGuild(ChannelStore.getChannel(channelId)?.guild_id)?.name ?? "Unknown Guild";
+
+        // What is the server link?
+        const link = this.getLinkFromMessageContent(content);
+        if (!link) return;
+
+        // log.info("Checking if link is processable...");
+        if (!this.isLinkProcessable(link)) return; // Is it on cooldown? (deduplication via link)
+        log.debug(`Detected link of type ${link.type} from ${authorUsername} (${authorId}):`, link);
+
+        // What biome is it?
+        const biomesMatched = this.detectBiomeKeywords(content);
+        const biome = biomesMatched?.[0];
+        if (biomesMatched.length === 0) {
+            log.debug(`❌ Link ${link.code} did not match any enabled biome.`);
+            return;
+        }
+        if (biomesMatched.length > 1) {
+            log.warn(`⚠️ Link ${link.code} matched multiple biomes: ${biomesMatched.join(", ")} — ignoring due to ambiguity.`);
+            return;
+        }
+        log.info(`✅ Link ${link.code} matched biome: ${biome}`);
+
+        const shouldNotifyThisMessage = this.config!.notifyEnabled; // snapshot the value before autojoin, because it MIGHT disable from this.config directly
+
+        // Should we join automatically?
+        if (this.config!.joinEnabled) {
+            const { isSafe, joinHappened } = await this.join(link);
+
+            // se o join aconteceu, e o servidor era inseguro, entao o usuário foi movido
+            // se o join aconteceu, e o servidor era seguro, tudo bem, continue
+            // se o join nao aconteceu, e o servidor era seguro, tudo bem, continue (nao tem como isso acontecer atualmente)
+            // se o join nao aconteceu, e o servidor era inseguro, tudo bem, continue
+
+            if (!isSafe && this.config!.monitorBlockUnsafeServerMessageAuthors) {
+                this.config!.monitorBlockedUserList += `,${authorId}`;
+            }
+
+            if (joinHappened && !isSafe) {
+                const title = "⚠️ SAJ :: Bad server!";
+                const body = [
+                    "The link you just tried to join was unsafe. You have been moved to a safe server. Click on this notification to jump to the bad message.",
+                    `In channel: ${channelName} (${guildName})`,
+                    `Sent by: ${authorUsername} (${authorId})`
+                ].join("\n");
+                const onClick = () => {
+                    const messageUrl = `https://discord.com/channels/${ChannelStore.getChannel(channelId)?.guild_id}/${channelId}/${message.id}`;
+                    window.open(messageUrl, "_blank");
+                };
+                this.sendNotification(title, body, onClick);
+                return;
+            }
+
+            if (!joinHappened && !isSafe) {
+                log.warn(`⚠️ Link ${link.code} was blocked.`);
+                return;
+            }
+
+            if (this.config!.joinDisableAfterAutoJoin) settings.store.joinEnabled = false;
+            if (this.config!.notifyDisableAfterAutoJoin) settings.store.notifyEnabled = false;
+        }
+
+        // Should we notify it?
+        if (shouldNotifyThisMessage) {
+            const title = `🎯 SAJ :: Detected ${biome}`;
+            const body = [
+                `Server: ${link.code} (${link.type})`,
+                `In channel: ${channelName} (${guildName})`,
+                `Sent by: ${authorUsername} (${authorId})`
+            ].join("\n");
+            const onClick = () => {
+                this.join(link);
+            };
+            this.sendNotification(title, body, onClick);
+        }
+
+    },
+
+    sendNotification(title: string, body: string, onclick?: () => void): void {
+        try {
+            const notif = new Notification(title, { body });
+            notif.onclick = () => {
+                if (onclick) {
+                    try {
+                        onclick();
+                    } catch (err) {
+                        this.log?.error("⚠️ Failed to run notification callback:", err);
+                    }
+                }
+                notif.close();
+            };
+        } catch (err) {
+            this.log?.error("⚠️ Failed to send notification:", err);
+        }
+    },
+
 });

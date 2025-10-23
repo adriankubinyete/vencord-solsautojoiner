@@ -5,14 +5,48 @@
  */
 
 import { Button } from "@components/Button";
+import { CheckedTextInput } from "@components/CheckedTextInput";
 import { FormSwitch } from "@components/FormSwitch";
+import { Margins } from "@components/margins";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
-import { ChannelRouter, ChannelStore, Forms, SelectedChannelStore, Toasts } from "@webpack/common";
+import { OptionType } from "@utils/types";
+import { ChannelRouter, ChannelStore, Forms, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
 
-import { BiomesConfig, settings } from "./settings";
+import { BiomeSettings, BiomesKeywords, settings } from "./settings";
+import { cl, getSettingMeta } from "./utils";
 
-// Componente para título de seção decorado com linha
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function Note({ children }: { children: React.ReactNode; }) {
+    return (
+        <div style={{
+            borderLeft: "2px solid #888",
+            paddingLeft: 8,
+            color: "#aaa",
+            fontSize: 13,
+            lineHeight: 1.4,
+            marginTop: -15,
+            marginBottom: 4,
+        }}>
+            {children}
+        </div>
+    );
+}
+
+
+
+function SectionMessage({ children }: { children: React.ReactNode; }) {
+    return (
+        <div style={{
+            color: "#aaa",
+            fontSize: 13,
+            margin: "8px 0",
+            lineHeight: 1.4,
+        }}>
+            {children}
+        </div>
+    );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode; }) {
     return (
         <div style={{
             display: "flex",
@@ -27,90 +61,123 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     );
 }
 
-function AutoJoinToggle() {
-    const { AutoJoin } = settings.use(["AutoJoin"]);
+type SettingProps<K extends keyof typeof settings.def> = {
+    setting: K;
+    customTitle?: string;
+    className?: string;
+    style?: React.CSSProperties;
+};
+
+export function Setting<K extends keyof typeof settings.def>({
+    setting,
+    customTitle,
+    className,
+    style,
+}: SettingProps<K>) {
+    const meta = getSettingMeta(setting);
+    const reactive = settings.use([setting]);
+    const value = reactive[setting];
+
+    const title =
+        customTitle ?? meta.key.replace(/([A-Z])/g, " $1").replace(/^./, c => c.toUpperCase());
+
+    let content: React.ReactNode;
+
+    switch (meta.type) {
+        case OptionType.BOOLEAN:
+            content = (
+                <FormSwitch
+                    title={title}
+                    description={meta.description ?? ""}
+                    value={Boolean(value)}
+                    onChange={v => settings.store[setting] = Boolean(v) as any}
+                    hideBorder
+                />
+            );
+            break;
+
+        case OptionType.STRING:
+            content = (
+                <>
+                    <div style={{ fontWeight: 500, color: "#ccc", marginBottom: 8 }}>{title}</div>
+                    <CheckedTextInput
+                        value={value !== undefined ? String(value) : ""}
+                        onChange={v => settings.store[setting] = String(v) as never}
+                        validate={() => true}
+                    />
+                    {meta.description && (
+                        <div style={{ marginTop: 6, color: "#ccc", fontSize: 12 }}>
+                            {meta.description}
+                        </div>
+                    )}
+                </>
+            );
+            break;
+
+        case OptionType.NUMBER:
+            content = (
+                <>
+                    <div style={{ fontWeight: 500, color: "#ccc", marginBottom: 8 }}>{title}</div>
+                    <CheckedTextInput
+                        value={value !== undefined ? String(value) : ""}
+                        onChange={v => settings.store[setting] = Number(Number(v)) as any}
+                        validate={v => (isNaN(Number(v)) ? "Invalid number" : true)}
+                    />
+                    {meta.description && (
+                        <div style={{ marginTop: 6, color: "#ccc", fontSize: 12 }}>
+                            {meta.description}
+                        </div>
+                    )}
+                </>
+            );
+            break;
+
+        case OptionType.SELECT: {
+            const options = meta.options?.map(o => ({ value: o.value, label: o.label })) ?? [];
+            content = (
+                <>
+                    <div style={{ fontWeight: 500, color: "#fff", marginBottom: 8 }}>{title}</div>
+                    {meta.description && (
+                        <div style={{ marginBottom: 8, color: "#ccc", fontSize: 12 }}>
+                            {meta.description}
+                        </div>
+                    )}
+                    <SearchableSelect
+                        options={options}
+                        value={options.find(o => o.value === value)}
+                        placeholder="Select an option"
+                        maxVisibleItems={5}
+                        closeOnSelect={true}
+                        onChange={v => settings.store[setting] = v}
+                    />
+                </>
+            );
+            break;
+        }
+
+        default:
+            content = (
+                <div style={{ color: "red" }}>
+                    Unsupported setting type for {meta.key}: {meta.type}
+                </div>
+            );
+    }
 
     return (
-        <div style={{ marginBottom: 24 }}>
-            <FormSwitch
-                title="Enable AutoJoin"
-                description="Automatically join valid Roblox share links detected."
-                value={AutoJoin}
-                onChange={v => settings.store.AutoJoin = v}
-                hideBorder
-            />
+        <div
+            className={className ?? Margins.bottom20}
+            style={{ ...(style || {}) }}>
+            {content}
         </div>
     );
 }
 
-function NotificationsToggle() {
-    const { Notifications } = settings.use(["Notifications"]);
-
-    return (
-        <div style={{ marginBottom: 24 }}>
-            <FormSwitch
-                title="Enable Notifications"
-                description="Send a desktop notification when a valid Roblox share link is detected. You can click the notification to join."
-                value={Notifications}
-                onChange={v => settings.store.Notifications = v}
-                hideBorder
-            />
-        </div>
-    );
-}
-
-function DisableAutoJoinAfterSuccessToggle() {
-    const { disableAutoJoinAfterSuccess } = settings.use(["disableAutoJoinAfterSuccess"]);
-
-    return (
-        <div style={{ marginBottom: 24 }}>
-            <FormSwitch
-                title="Disable AutoJoin After Success"
-                description="Automatically disable AutoJoin after a successful join to avoid joining another link while in-game."
-                value={disableAutoJoinAfterSuccess}
-                onChange={v => settings.store.disableAutoJoinAfterSuccess = v}
-                hideBorder
-            />
-        </div>
-    );
-}
-
-function DisableNotificationsAfterSuccessToggle() {
-    const { disableNotificationsAfterSuccess } = settings.use(["disableNotificationsAfterSuccess"]);
-
-    return (
-        <div style={{ marginBottom: 24 }}>
-            <FormSwitch
-                title="Disable Notifications After Success"
-                description="Disable Notifications after a successful join. Only applies to automatic joins, not manual clicks on notifications."
-                value={disableNotificationsAfterSuccess}
-                onChange={v => settings.store.disableNotificationsAfterSuccess = v}
-                hideBorder
-            />
-        </div>
-    );
-}
-
-function ShiftClickAlsoToggleNotificationsToggle() {
-    const { shiftClickAlsoToggleNotifications } = settings.use(["shiftClickAlsoToggleNotifications"]);
-
-    return (
-        <div style={{ marginBottom: 24 }}>
-            <FormSwitch
-                title="Shift-click also toggles Notifications"
-                description="When shift-clicking this menu icon in the chat bar, also toggle Notifications together with AutoJoin."
-                value={shiftClickAlsoToggleNotifications}
-                onChange={v => settings.store.shiftClickAlsoToggleNotifications = v}
-                hideBorder
-            />
-        </div>
-    );
-}
+// -------------------------------
 
 function ForceLoadChannelsButton() {
     const handleClick = async () => {
         try {
-            const monitoredCsv = settings.store.MonitoredChannels ?? "";
+            const monitoredCsv = settings.store.monitorChannelList ?? "";
             const monitored = monitoredCsv.split(",").map(s => s.trim()).filter(Boolean);
 
             if (!Array.isArray(monitored) || monitored.length === 0) {
@@ -190,66 +257,58 @@ function ForceLoadChannelsButton() {
     );
 }
 
-
-function BiomeToggle({ biomeKey, label, description }: { biomeKey: keyof BiomesConfig; label: string; description: string; }) {
-    const { [biomeKey]: value } = settings.use([biomeKey]);
-
-    return (
-        <div style={{ marginBottom: 12 }}>
-            <FormSwitch
-                title={label}
-                description={description}
-                value={value}
-                onChange={v => settings.store[biomeKey] = v}
-                hideBorder
-            />
-        </div>
-    );
-}
+// -------------------------------
 
 export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
     return (
         <ModalRoot {...rootProps}>
-            <ModalHeader>
-                <Forms.FormTitle tag="h2">
+            <ModalHeader className={cl("modal-header")}>
+                <Forms.FormTitle tag="h2" className={cl("modal-title")}>
                     SolsAutoJoiner Settings
                 </Forms.FormTitle>
                 <ModalCloseButton onClick={rootProps.onClose} />
             </ModalHeader>
 
-            <ModalContent>
-                {/* Seção AutoJoin */}
+            <ModalContent className={cl("modal-content")}>
                 <SectionTitle>On link detection</SectionTitle>
-                <AutoJoinToggle />
-                <NotificationsToggle />
+                <Setting setting="joinEnabled" />
+                <Setting setting="notifyEnabled" />
 
-                {/* Seção Disable After Success */}
                 <SectionTitle>Post-Join Behavior</SectionTitle>
-                <DisableAutoJoinAfterSuccessToggle />
-                <DisableNotificationsAfterSuccessToggle />
+                <Setting setting="joinDisableAfterAutoJoin" />
+                <Setting setting="notifyDisableAfterAutoJoin" />
+                <Setting setting="verifyMode" />
+                <Note>Requires a Roblosecurity token set. Otherwise, does nothing.</Note>
 
-                {/* Seção Biomes */}
                 <SectionTitle>Biomes</SectionTitle>
+                {(Object.keys(BiomesKeywords) as (keyof BiomeSettings)[]).map(biomeKey => (
+                    <Setting
+                        key={biomeKey}
+                        setting={biomeKey}
+                        customTitle={biomeKey}
+                        style={{ marginBottom: 12 }}
+                    />
+                ))}
 
-                <BiomeToggle biomeKey="GLITCHED" label="GLITCHED" description="" />
-                <BiomeToggle biomeKey="DREAMSPACE" label="DREAMSPACE" description="" />
-                <BiomeToggle biomeKey="BLOODRAIN" label="BLOODRAIN" description="" />
-                <BiomeToggle biomeKey="PUMPKINMOON" label="PUMPKINMOON" description="" />
-                <BiomeToggle biomeKey="GRAVEYARD" label="GRAVEYARD" description="" />
-                <BiomeToggle biomeKey="NULL" label="NULL" description="" />
-                <BiomeToggle biomeKey="CORRUPTION" label="CORRUPTION" description="" />
-                <BiomeToggle biomeKey="HELL" label="HELL" description="" />
-                <BiomeToggle biomeKey="STARFALL" label="STARFALL" description="" />
-                <BiomeToggle biomeKey="SANDSTORM" label="SANDSTORM" description="" />
-                <BiomeToggle biomeKey="SNOWY" label="SNOWY" description=""/>
-                <BiomeToggle biomeKey="WINDY" label="WINDY" description="" />
-                <BiomeToggle biomeKey="RAINY" label="RAINY" description="" />
+                <SectionTitle>Link Verification</SectionTitle>
+                <SectionMessage>All configurations listed here will only work if you have set a Roblosecurity token to resolve links. To configure a Roblosecurity token, navigate to the plugin's settings page.</SectionMessage>
+                <Setting setting="verifyMode" /> {/* Yes, yes, I know this is duplicated */}
+                <Setting setting="verifyAllowedPlaceIds" />
+                <Setting setting="verifyBlockedPlaceIds" />
+                <Setting setting="monitorBlockUnsafeServerMessageAuthors" />
 
-                {/* Seção Other Settings */}
+                <SectionTitle>Monitored Channels</SectionTitle>
+                <Setting setting="monitorChannelList" />
+                <Setting setting="monitorBlockedUserList" />
+
                 <SectionTitle>Other Settings</SectionTitle>
-                <ShiftClickAlsoToggleNotificationsToggle />
+                <Setting setting="uiShortcutAction" />
+                <Setting setting="_dev_dedupe_link_cooldown_ms" />
+                <Setting setting="_dev_verification_fail_fallback_delay_ms" />
                 <ForceLoadChannelsButton />
+
             </ModalContent>
+
         </ModalRoot>
     );
 }

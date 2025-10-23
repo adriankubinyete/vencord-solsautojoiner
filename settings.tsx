@@ -15,67 +15,116 @@ import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
 export const settings = definePluginSettings({
-    Notifications: {
-        type: OptionType.BOOLEAN,
-        description: "Send a desktop notification when a valid Roblox share link is detected.",
-        default: false
-    },
-    AutoJoin: {
+    /*
+    * Main Settings
+    */
+    joinEnabled: {
         type: OptionType.BOOLEAN,
         description: "Automatically join valid Roblox share links detected.",
         default: false
     },
-    disableAutoJoinAfterSuccess: {
+    notifyEnabled: {
         type: OptionType.BOOLEAN,
-        description: "Disable AutoJoin after successful joins. Only applies to automatic joins, not manual clicks on notifications. This is recommended to avoid joining a new link while you're already in game, you can re-enable it manually via the chat menu icon or context menu.",
-        default: true
-    },
-    disableNotificationsAfterSuccess: {
-        type: OptionType.BOOLEAN,
-        description: "Disable Notifications after a successful join. Only applies to automatic joins, not manual clicks on notifications.",
+        description: "Send a desktop notification when a valid Roblox share link is detected.",
         default: false
     },
-    shiftClickAlsoToggleNotifications: {
+
+    /*
+    * After-Join behavior
+    */
+    joinDisableAfterAutoJoin: {
         type: OptionType.BOOLEAN,
-        description: "When shift-clicking the chat bar icon, also toggle notifications along with AutoJoin.",
+        description: "Disable automatic joins after a sucessful one join.",
+        default: true
+    },
+    notifyDisableAfterAutoJoin: {
+        type: OptionType.BOOLEAN,
+        description: "Disable notifications after a sucessful automatic join.",
         default: false
     },
-    showIcon: {
+
+    /*
+    * UI and shortcut
+    */
+    uiShowChatBarIcon: {
         type: OptionType.BOOLEAN,
-        default: false,
-        description: "Shows an icon for toggling AutoJoin in discord's chat bar"
-    },
-    contextMenu: {
-        type: OptionType.BOOLEAN,
-        description: "Add option to toggle AutoJoin in discord's chat bar context menu",
-        default: true,
-    },
-    showAutoJoinTooltip: {
-        type: OptionType.BOOLEAN,
-        description: "Show tooltip when Auto Join is enabled",
+        description: "Shows an icon in the chat bar for quick access to the plugin's settings.",
         default: true
     },
-    showAutoJoinAlert: {
-        type: OptionType.BOOLEAN,
-        description: "Show alert when enabling Auto Join",
-        default: true
+    uiShortcutAction: {
+        type: OptionType.SELECT,
+        description: "Action performed when right-clicking the chat bar icon.",
+        default: "toggleAutoJoin",
+        options: [
+            { label: "No action", value: "none" },
+            { label: "Toggle AutoJoin", value: "toggleJoin" },
+            { label: "Toggle AutoJoin and Notifications", value: "toggleJoinAndNotifications" },
+        ]
     },
-    MonitoredChannels: {
+
+    /*
+    * Monitoring
+    */
+    monitorChannelList: {
         type: OptionType.STRING,
-        description: "Comma-separated channel IDs to monitor",
-        default: "",
-        restartNeeded: true
-    },
-    forceNavigateToMonitoredChannelsOnStartup: {
-        type: OptionType.BOOLEAN,
-        description: "Whenever you start Vencord, it will quickly navigate to each monitored channel to ensure you're subscribed.",
-        default: false
-    },
-    IgnoredUsers: {
-        type: OptionType.STRING,
-        description: "Comma-separated user IDs to ignore",
+        description: "Comma-separated channel IDs to monitor for valid server links.",
         default: ""
     },
+    monitorNavigateToChannelsOnStartup: {
+        type: OptionType.BOOLEAN,
+        description: "Whenever you start Vencord, it will quickly navigate to each monitored channel to ensure they are loaded.",
+        default: false
+    },
+    monitorBlockedUserList: {
+        type: OptionType.STRING,
+        description: "Comma-separated user IDs to ignore messages from when monitoring channels. This will only work if you're verifying server links.",
+        default: ""
+    },
+    monitorBlockUnsafeServerMessageAuthors: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically put users who post unsafe server links into the monitorBlockedUserList.",
+        default: false
+    },
+
+    /*
+    * Link verification
+    */
+
+    verifyRoblosecurityToken: {
+        type: OptionType.STRING,
+        description: ".ROBLOSECURITY token used for verifying place IDs when joining. It is required for any place ID verification to work. If it's not set, no verification will be done no matter what settings you have. This is totally optional if you don't want to use place ID verification. (Recommendation: create a fresh throwaway account for this purpose)",
+        default: ""
+    },
+    verifyMode: {
+        type: OptionType.SELECT,
+        description: "When to verify Roblox place IDs.",
+        default: "none",
+        options: [
+            { label: "No verification", value: "none" },
+            { label: "Verify before joining (may slow your join time)", value: "before" },
+            { label: "Verify after joining (riskier but won't slow your join time)", value: "after" },
+        ]
+    },
+    verifyAllowedPlaceIds: {
+        type: OptionType.STRING,
+        description: "Comma-separated list of allowed place IDs. If empty, all place IDs are allowed.",
+        default: ""
+    },
+    verifyBlockedPlaceIds: {
+        type: OptionType.STRING,
+        description: "Comma-separated list of blocked place IDs. If empty, no place IDs are blocked.",
+        default: ""
+    },
+    verifyAfterJoinFailFallbackDelayMs: {
+        type: OptionType.NUMBER,
+        description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
+        default: 5000
+    },
+
+    /*
+    * Biome detection
+    */
+    // biome stuff
     GLITCHED: { type: OptionType.BOOLEAN, description: "", default: false },
     DREAMSPACE: { type: OptionType.BOOLEAN, description: "", default: false },
     BLOODRAIN: { type: OptionType.BOOLEAN, description: "", default: false },
@@ -89,28 +138,45 @@ export const settings = definePluginSettings({
     SNOWY: { type: OptionType.BOOLEAN, description: "", default: false },
     WINDY: { type: OptionType.BOOLEAN, description: "", default: false },
     RAINY: { type: OptionType.BOOLEAN, description: "", default: false },
-    _dev_dedupe_link_cooldown: {
-        type: OptionType.STRING,
-        description: "(developer option) Cooldown in seconds to ignore duplicate links",
-        default: "30"
-    }
+
+    /*
+    * Developer options
+    */
+    _dev_dedupe_link_cooldown_ms: {
+        type: OptionType.NUMBER,
+        description: "Cooldown in milliseconds to ignore duplicate links",
+        default: 10000
+    },
+    _dev_verification_fail_fallback_delay_ms: {
+        type: OptionType.NUMBER,
+        description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
+        default: 5000
+    },
 });
 
 // Config geral do plugin
-export interface JoinerConfig {
-    AutoJoin: boolean;
-    Notifications: boolean;
-    MonitoredChannels: string;
-    IgnoredUsers: string;
-    disableAutoJoinAfterSuccess: boolean;
-    disableNotificationsAfterSuccess: boolean;
-    shiftClickAlsoToggleNotifications: boolean;
-    forceChannelSubscriptionOnStartup: boolean;
-    _dev_dedupe_link_cooldown: string; // string que será interpretada como número
+export interface PluginSettings {
+    joinEnabled: boolean;
+    notifyEnabled: boolean;
+    joinDisableAfterAutoJoin: boolean;
+    notifyDisableAfterAutoJoin: boolean;
+    uiShowChatBarIcon: boolean;
+    uiShortcutAction: "none" | "toggleJoin" | "toggleJoinAndNotifications";
+    monitorChannelList: string;
+    monitorNavigateToChannelsOnStartup: boolean;
+    monitorBlockedUserList: string;
+    monitorBlockUnsafeServerMessageAuthors: boolean;
+    verifyRoblosecurityToken: string;
+    verifyMode: "none" | "before" | "after";
+    verifyAllowedPlaceIds: string;
+    verifyBlockedPlaceIds: string;
+    verifyAfterJoinFailFallbackDelayMs: number;
+    _dev_dedupe_link_cooldown_ms: number;
+    _dev_verification_fail_fallback_delay_ms: number;
 }
 
 // Config dos biomes
-export interface BiomesConfig {
+export interface BiomeSettings {
     GLITCHED: boolean;
     DREAMSPACE: boolean;
     BLOODRAIN: boolean;
@@ -127,10 +193,10 @@ export interface BiomesConfig {
 }
 
 // Junta plugin + biomes
-export type FullJoinerConfig = JoinerConfig & BiomesConfig;
+export type JoinerSettings = PluginSettings & BiomeSettings;
 
 // Palavras-chave por biome
-export const BiomesKeywords: Record<keyof BiomesConfig, string[]> = {
+export const BiomesKeywords: Record<keyof BiomeSettings, string[]> = {
     GLITCHED: ["glitch", "glitched"],
     DREAMSPACE: ["dream", "dream space", "dreamspace"],
     BLOODRAIN: ["blood rain", "blood", "bloodrain"],

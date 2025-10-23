@@ -38,10 +38,10 @@ export function JoinerIcon({
 export let setShouldShowJoinEnabledTooltip: undefined | ((show: boolean) => void);
 
 export const JoinerChatBarIcon: ChatBarButtonFactory = ({ isMainChat }) => {
-    const { AutoJoin: isEnabled, showIcon, showAutoJoinTooltip } = settings.use([
-        "AutoJoin",
-        "showIcon",
-        "showAutoJoinTooltip"
+    const { joinEnabled: isEnabled, uiShowChatBarIcon, uiShortcutAction } = settings.use([
+        "joinEnabled",
+        "uiShowChatBarIcon",
+        "uiShortcutAction",
     ]);
 
     const [shouldShowJoinEnabledTooltip, setter] = useState(false);
@@ -50,19 +50,18 @@ export const JoinerChatBarIcon: ChatBarButtonFactory = ({ isMainChat }) => {
         return () => setShouldShowJoinEnabledTooltip = undefined;
     }, []);
 
-    if (!isMainChat || !showIcon) return null;
+    if (!isMainChat || !uiShowChatBarIcon) return null;
 
     const toggleAutoJoin = () => {
-        const newState = !settings.store.AutoJoin;
-        settings.store.AutoJoin = newState;
+        const newState = !settings.store.joinEnabled;
+        settings.store.joinEnabled = newState;
 
-        const alsoTogglesNotifications = settings.store.shiftClickAlsoToggleNotifications;
-
-        if (alsoTogglesNotifications) {
-            settings.store.Notifications = newState;
+        // Determine if notifications should also be toggled
+        if (uiShortcutAction === "toggleJoinAndNotifications") {
+            settings.store.notifyEnabled = newState;
         }
 
-        const message = alsoTogglesNotifications
+        const message = uiShortcutAction === "toggleJoinAndNotifications"
             ? `AutoJoin and Notifications ${newState ? "enabled" : "disabled"}`
             : `AutoJoin ${newState ? "enabled" : "disabled"}`;
 
@@ -80,11 +79,11 @@ export const JoinerChatBarIcon: ChatBarButtonFactory = ({ isMainChat }) => {
         <ChatBarButton
             tooltip="Open SolsAutoJoiner Modal"
             onClick={e => {
-                if (e.shiftKey) {
+                // Se o atalho do ícone está configurado
+                if (uiShortcutAction !== "none" && e.shiftKey) {
                     toggleAutoJoin();
                     return;
                 }
-
                 openModal(props => <JoinerModal rootProps={props} />);
             }}
             onContextMenu={e => {
@@ -100,7 +99,7 @@ export const JoinerChatBarIcon: ChatBarButtonFactory = ({ isMainChat }) => {
                 className={cl({ "auto-join": isEnabled, "chat-button": true })}
             />
 
-            {/* Indicador visual de AutoJoin desativado */}
+            {/* Indicador visual de AutoJoin ativado */}
             {isEnabled && (
                 <div
                     style={{
@@ -117,12 +116,13 @@ export const JoinerChatBarIcon: ChatBarButtonFactory = ({ isMainChat }) => {
         </ChatBarButton>
     );
 
-    if (shouldShowJoinEnabledTooltip && showAutoJoinTooltip)
+    if (shouldShowJoinEnabledTooltip && isEnabled) {
         return (
             <Tooltip text="Auto Join Enabled" forceOpen>
                 {() => button}
             </Tooltip>
         );
+    }
 
     return button;
 };
