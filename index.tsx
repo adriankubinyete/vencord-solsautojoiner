@@ -38,7 +38,7 @@ const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channe
     group.push(
         <Menu.MenuItem
             id="vc-saj-monitor-toggle"
-            label={isMonitored ? "SolsAuto stop monitoring" : "SolsAuto start monitoring"}
+            label={isMonitored ? "SolsAuto stop monitoring" : "SolsAuto add to monitoring"}
             color={isMonitored ? "danger" : "brand"}
             action={() => {
                 if (isMonitored) {
