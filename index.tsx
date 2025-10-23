@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { findGroupChildrenByChildId,NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { Settings } from "@api/Settings";
 import { copyToClipboard } from "@utils/clipboard";
 import definePlugin from "@utils/types";
-import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, NavigationRouter } from "@webpack/common";
+import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu,NavigationRouter } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
 import { BiomeSettings, BiomesKeywords, JoinerSettings, settings } from "./settings";
@@ -15,11 +16,63 @@ import { createLogger } from "./utils";
 
 const log = createLogger("[SolsAutoJoiner]", true);
 
+// logo acima do export default
+const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channel }) => {
+    if (!channel) return children;
+
+    const config = Settings.plugins.SolsAutoJoiner as unknown as JoinerSettings;
+    const monitoredChannels = new Set(
+        config.monitorChannelList
+            .split(",")
+            .map(id => id.trim())
+            .filter(Boolean)
+    );
+
+    log.warn("[patchChannelContextMenu] Config:", config);
+    log.warn("[patchChannelContextMenu] Monitored channels:", monitoredChannels);
+
+    const isMonitored = monitoredChannels.has(channel.id);
+
+    const group = findGroupChildrenByChildId("mark-channel-read", children) ?? children;
+
+    group.push(
+        <Menu.MenuItem
+            id="vc-saj-monitor-toggle"
+            label={isMonitored ? "SolsAuto stop monitoring" : "SolsAuto start monitoring"}
+            color={isMonitored ? "danger" : "brand"}
+            action={() => {
+                if (isMonitored) {
+                    monitoredChannels.delete(channel.id);
+                } else {
+                    monitoredChannels.add(channel.id);
+                }
+                config.monitorChannelList = Array.from(monitoredChannels).join(",");
+            }}
+        />
+    );
+
+    return children;
+};
+
+// function addDeleteStyle() {
+//     if (Settings.plugins.MessageLogger.deleteStyle === "text") {
+//         enableStyle(textStyle);
+//         disableStyle(overlayStyle);
+//     } else {
+//         disableStyle(textStyle);
+//         enableStyle(overlayStyle);
+//     }
+// }
+
 export default definePlugin({
     name: "SolsAutoJoiner",
     description: "Monitor specific channels for Roblox share links + selected biomes",
     authors: [{ name: "masutty", id: 188851299255713792n }],
     settings,
+
+    contextMenus: {
+        "channel-context": patchChannelContextMenu,
+    },
 
     renderChatBarButton: JoinerChatBarIcon,
 
