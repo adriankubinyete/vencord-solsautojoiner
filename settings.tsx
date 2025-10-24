@@ -142,6 +142,18 @@ export const settings = definePluginSettings({
     /*
     * Developer options
     */
+   _dev_logging_level: {
+       type: OptionType.SELECT,
+       description: "Console logging level",
+       default: "info",
+       options: [
+           { label: "Trace", value: "trace" },
+           { label: "Debug", value: "debug" },
+           { label: "Info", value: "info" },
+           { label: "Warn", value: "warn" },
+           { label: "Error", value: "error" },
+       ]
+   },
     _dev_dedupe_link_cooldown_ms: {
         type: OptionType.NUMBER,
         description: "Cooldown in milliseconds to ignore duplicate links",

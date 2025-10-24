@@ -14,7 +14,7 @@ import { JoinerChatBarIcon } from "./JoinerIcon";
 import { BiomeSettings, BiomesKeywords, JoinerSettings, settings } from "./settings";
 import { createLogger } from "./utils";
 
-const log = createLogger("[SolsAutoJoiner]", true);
+const logger = createLogger("SolsAutoJoiner");
 
 // logo acima do export default
 const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channel }) => {
@@ -54,16 +54,6 @@ const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channe
     return children;
 };
 
-// function addDeleteStyle() {
-//     if (Settings.plugins.MessageLogger.deleteStyle === "text") {
-//         enableStyle(textStyle);
-//         disableStyle(overlayStyle);
-//     } else {
-//         disableStyle(textStyle);
-//         enableStyle(overlayStyle);
-//     }
-// }
-
 export default definePlugin({
     name: "SolsAutoJoiner",
     description: "Monitor specific channels for Roblox share links + selected biomes",
@@ -86,6 +76,7 @@ export default definePlugin({
      */
 
     async preloadMonitoredChannels(monitored: Set<string>) {
+        const log = logger.inherit("preloadMonitoredChannels");
         if (!monitored.size) return;
 
         for (const channelId of monitored) {
@@ -104,6 +95,7 @@ export default definePlugin({
     },
 
     start() {
+        const log = logger.inherit("start");
         // Carrega a configuração do plugin
         const config = Settings.plugins.SolsAutoJoiner as unknown as JoinerSettings;
         this.config = config;
@@ -132,6 +124,7 @@ export default definePlugin({
     },
 
     stop() {
+        const log = logger.inherit("stop");
         if (this.boundHandler) FluxDispatcher.unsubscribe("MESSAGE_CREATE", this.boundHandler);
         this.boundHandler = null;
         this.config = null;
@@ -159,6 +152,7 @@ export default definePlugin({
     },
 
     getLinkFromMessageContent(content: string) {
+        const log = logger.inherit("getLinkFromMessageContent");
         if (!content?.trim()) return null;
 
         const normalized = content.toLowerCase();
@@ -173,7 +167,7 @@ export default definePlugin({
         const hasPrivate = Boolean(privateMatch);
 
         if (hasShare && hasPrivate) {
-            log.warn("[getLinkFromMessageContent] ⚠️ Both a share link and a private server link found in the same message — ignoring due to ambiguity.");
+            log.warn("⚠️ Both a share link and a private server link found in the same message — ignoring due to ambiguity.");
             return null;
         }
 
@@ -189,6 +183,7 @@ export default definePlugin({
     },
 
     isLinkCodeOnCooldown(code: string): boolean {
+        const log = logger.inherit("isLinkCodeOnCooldown");
         const now = Date.now();
         const cooldownMs = this.config!._dev_dedupe_link_cooldown_ms || 10000;
         const lastTime = this.linkCodeTimestamps!.get(code) ?? 0;
@@ -206,7 +201,8 @@ export default definePlugin({
     },
 
     isLinkProcessable(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }) {
-        // log.info(`[isLinkProcessable] Processing link: ${link.code}`);
+        const log = logger.inherit("isLinkProcessable");
+        log.trace(`Processing link: ${link.code}`);
         if (this.isLinkCodeOnCooldown(link.code)) return false;
         this.markLinkCodeAsProcessed(link.code);
         return true;
@@ -228,31 +224,32 @@ export default definePlugin({
 
     // true if join was successful, false otherwise (currently means join is unsafe)
     async join(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
+        const log = logger.inherit("join");
         const verifyMode = this.config!.verifyMode || "none";
         const fallbackActionDelayMs = this.config!._dev_verification_fail_fallback_delay_ms || 5000;
         let isSafe = false;
         let joinHappened = false;
 
-        log.debug(`[join] Verification mode: ${verifyMode}}`);
+        log.debug(`Verification mode: ${verifyMode}}`);
 
         if (verifyMode === "before") {
             const { allowed, message } = await this.isSafeLink(link);
             if (!allowed) {
-                log.warn(`[join] ⚠️ Link verification (before) failed: ${message}`);
+                log.warn(`⚠️ Link verification (before) failed: ${message}`);
                 return { isSafe, joinHappened };
             }
             isSafe = true;
         }
 
-        log.warn(`[join] Joining link: ${link.link}`);
+        log.debug(`Joining link: ${link.link}`);
         await this.openRoblox(link);
         joinHappened = true;
 
         if (verifyMode === "after") {
             const { allowed, message } = await this.isSafeLink(link);
             if (!allowed) {
-                log.warn(`[join] ⚠️ Link verification (after) failed: ${message}`);
-                log.info(`[join] Waiting ${fallbackActionDelayMs}ms before fallback action...`);
+                log.warn(`⚠️ Link verification (after) failed: ${message}`);
+                log.debug(`Waiting ${fallbackActionDelayMs}ms before fallback action...`);
                 await new Promise(res => setTimeout(res, fallbackActionDelayMs));
                 await this.openRoblox({ type: "public", placeId: "15532962292" });
                 return { isSafe, joinHappened };
@@ -264,12 +261,13 @@ export default definePlugin({
     },
 
     async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }) {
+        const log = logger.inherit("openRoblox");
         const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
             openRoblox: (uri: string) => Promise<void>;
         };
 
         if (!link?.type) {
-            log.error("[openRoblox] ❌ Missing link type.");
+            log.error("❌ Missing link type.");
             return;
         }
 
@@ -278,7 +276,7 @@ export default definePlugin({
         switch (link.type) {
             case "public":
                 if (!link.placeId) {
-                    log.error("[openRoblox] ❌ Missing placeId for public link.");
+                    log.error("❌ Missing placeId for public link.");
                     return;
                 }
                 uri = `roblox://placeID=${link.placeId}`;
@@ -286,7 +284,7 @@ export default definePlugin({
 
             case "share":
                 if (!link.code) {
-                    log.error("[openRoblox] ❌ Missing share code.");
+                    log.error("❌ Missing share code.");
                     return;
                 }
                 uri = `roblox://navigation/share_links?code=${link.code}&type=Server`;
@@ -294,7 +292,7 @@ export default definePlugin({
 
             case "private":
                 if (!link.placeId || !link.code) {
-                    log.error("[openRoblox] ❌ Missing placeId or linkCode for private link.");
+                    log.error("❌ Missing placeId or linkCode for private link.");
                     return;
                 }
                 uri = `roblox://placeID=${link.placeId}&linkCode=${link.code}`;
@@ -302,25 +300,26 @@ export default definePlugin({
         }
 
         if (!uri) {
-            log.error("[openRoblox] ❌ Failed to construct URI.");
+            log.error("❌ Failed to construct URI.");
             return;
         }
 
         try {
             await Native.openRoblox(uri);
-            log.debug("[openRoblox] Roblox process spawned successfully.");
+            log.debug("Roblox process spawned successfully.");
         } catch (err) {
-            log.error("[openRoblox] ⚠️ Failed to open Roblox link:", err);
+            log.error("⚠️ Failed to open Roblox link:", err);
         }
     },
 
     async resolveShareCode(shareCode: string): Promise<{ placeId: string; } | undefined> {
+        const log = logger.inherit("resolveShareCode");
         try {
-            log.debug(`[resolveShareCode] Resolving share code ${shareCode}`);
+            log.debug(`Resolving share code ${shareCode}`);
 
             const token = this.config!.verifyRoblosecurityToken;
             if (!token) {
-                log.warn("[resolveShareCode] No .ROBLOSECURITY token set.");
+                log.warn("No .ROBLOSECURITY token set.");
                 return undefined;
             }
 
@@ -333,46 +332,47 @@ export default definePlugin({
             // 1️⃣ Busca CSRF token
             const { status: csrfStatus, csrf } = await Native.fetchRobloxCsrf(token);
             // status 403 expected
-            log.debug(`[resolveShareCode] CSRF - Status: ${csrfStatus || null}`);
+            log.debug(`CSRF - Status: ${csrfStatus || null}`);
 
             if (!csrf) {
-                log.warn(`[resolveShareCode] Failed to fetch CSRF token for share code ${shareCode}`);
+                log.warn(`Failed to fetch CSRF token for share code ${shareCode}`);
                 return undefined;
             }
 
             // 2️⃣ Resolve o share link usando o CSRF
             const { status, data } = await Native.resolveRobloxShareLink(token, csrf, shareCode);
-            log.debug(`[resolveShareCode]  Status: ${status}, Data:`, data);
+            log.debug(` Status: ${status}, Data:`, data);
 
             if (!data || status !== 200) {
-                log.error(`[resolveShareCode]  Failed to resolve share code ${shareCode}`);
-                log.error(`[resolveShareCode]  ${data}}`);
+                log.error(` Failed to resolve share code ${shareCode}`);
+                log.error(` ${data}}`);
                 // if the word "auth" is mentioned in the error, it probably means we need a new token
                 if (data?.includes("auth")) {
-                    log.warn("[resolveShareCode] ⚠️ Your .ROBLOSECURITY token is probably expired. Try setting a new one.");
+                    log.warn("⚠️ Your .ROBLOSECURITY token is probably expired. Try setting a new one.");
                     this.sendNotification("⚠️ Your .ROBLOSECURITY token is probably expired.", "Try setting a new one for SolsAutoJoiner to continue validating your links, or disable link validation.");
                 }
                 return undefined;
             }
 
             const serverData = data?.privateServerInviteData;
-            log.debug("[resolveShareCode] server data:", serverData);
+            log.debug("server data:", serverData);
 
             if (serverData?.status !== "Valid") {
-                log.warn(`[resolveShareCode] Share code ${shareCode} is not valid.`);
+                log.warn(`Share code ${shareCode} is not valid.`);
                 return undefined;
             }
 
-            log.info(`[resolveShareCode] Share code ${shareCode} resolved successfully: placeId=${serverData.placeId}`);
+            log.info(`Share code ${shareCode} resolved successfully: placeId=${serverData.placeId}`);
             const stringifiedPlaceId = serverData.placeId.toString();
             return { placeId: stringifiedPlaceId };
         } catch (err) {
-            log.error(`[resolveShareCode] Error resolving share code ${shareCode}:`, err);
+            log.error(`Error resolving share code ${shareCode}:`, err);
             return undefined;
         }
     },
 
     async isSafeLink(link: { link: string; type: "share" | "private" | "public"; code: string; placeId?: string; }): Promise<{ allowed: boolean; message: string; }> {
+        const log = logger.inherit("isSafeLink");
         let { placeId } = link;
 
         // --- PRIVATE SERVER LINKS ---
@@ -397,8 +397,8 @@ export default definePlugin({
             const resolved = await this.resolveShareCode(link.code);
             placeId = resolved?.placeId;
 
-            log.warn(`Resolved PlaceId: ${placeId}`);
-            log.warn(`Type of resolved placeid: ${typeof placeId}`);
+            log.trace(`Resolved PlaceId: ${placeId}`);
+            log.trace(`Type of resolved placeid: ${typeof placeId}`);
 
             if (!placeId) {
                 return { allowed: false, message: "Failed to resolve placeId from share link." };
@@ -439,6 +439,7 @@ export default definePlugin({
     */
 
     async handleNewMessage(data: { channelId: string; message: any; }) {
+        const log = logger.inherit("handleNewMessage");
         const msgStartTime = performance.now();
 
         // Is it a valid message?

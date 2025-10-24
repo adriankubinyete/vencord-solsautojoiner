@@ -400,6 +400,43 @@ function GetRobloxButton() {
     );
 }
 
+function DebugButton() {
+    const handleClick = async () => {
+        try {
+            console.log("a");
+        } catch (err) {
+            Toasts.show(
+                Toasts.create("Failed to log...?", Toasts.Type.FAILURE, {
+                    duration: 2000,
+                    position: Toasts.Position.BOTTOM,
+                })
+            );
+        }
+    };
+
+    return (
+        <div style={{ marginBottom: 20 }}>
+            <Button
+                onClick={handleClick}
+                style={{
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    marginBottom: 8,
+                    backgroundColor: "#4c8ae8",
+                    color: "#fff",
+                }}
+            >
+                Debug
+            </Button>
+            <div style={{ color: "#ccc", fontSize: 12 }}>
+                Debug button which does something.
+            </div>
+        </div>
+    );
+}
+
 
 // -------------------------------
 
@@ -450,8 +487,10 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <Setting setting="uiShortcutAction" />
 
                 <SectionTitle>Developer Settings</SectionTitle>
+                <Setting setting="_dev_logging_level" />
                 <Setting setting="_dev_dedupe_link_cooldown_ms" />
                 <Setting setting="_dev_verification_fail_fallback_delay_ms" />
+                <DebugButton />
                 <GetRobloxButton />
                 <CloseRobloxButton />
 

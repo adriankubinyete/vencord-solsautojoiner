@@ -11,7 +11,7 @@ export const cl = classNameFactory("vc-joiner-");
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
 
-const COLORS = {
+const COLORS: Record<LogLevel, string> = {
     trace: "color: #6b7280",
     debug: "color: #9ca3af",
     info: "color: #3b82f6",
@@ -19,15 +19,25 @@ const COLORS = {
     error: "color: #ef4444",
 };
 
-export function createLogger(name: string, debugEnabled: boolean) {
-    function log(level: LogLevel, ...args: any[]) {
-        if (level === "debug" && !debugEnabled) return;
-        const color = COLORS[level];
-        const tag = `[${name}] [${level.toUpperCase()}]`;
-        console.log(`%c${tag}`, color, ...args);
+const LEVEL_ORDER: LogLevel[] = ["trace", "debug", "info", "warn", "error"];
+
+export function createLogger(name: string) {
+    // Função interna que lê o nível dinamicamente
+    function getCurrentLevel(): LogLevel {
+        return (settings.store._dev_logging_level as LogLevel) ?? "trace";
+    }
+
+    function log(msgLevel: LogLevel, ...args: any[]) {
+        const currentLevel = getCurrentLevel();
+        if (LEVEL_ORDER.indexOf(msgLevel) < LEVEL_ORDER.indexOf(currentLevel)) return;
+        const color = COLORS[msgLevel];
+        console.log(`%c[${msgLevel.toUpperCase()}] [${name}]`, color, ...args);
     }
 
     return {
+        inherit(subName: string) {
+            return createLogger(`${name}.${subName}`);
+        },
         trace: (...args: any[]) => log("trace", ...args),
         debug: (...args: any[]) => log("debug", ...args),
         info: (...args: any[]) => log("info", ...args),
@@ -35,6 +45,8 @@ export function createLogger(name: string, debugEnabled: boolean) {
         error: (...args: any[]) => log("error", ...args),
     };
 }
+
+
 
 export interface SettingMeta {
     key: string;
