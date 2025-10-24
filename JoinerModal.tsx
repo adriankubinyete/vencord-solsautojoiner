@@ -157,7 +157,7 @@ export function Setting<K extends keyof typeof settings.def>({
             const options = meta.options?.map(o => ({ value: o.value, label: o.label })) ?? [];
             content = (
                 <>
-                    <div style={{ fontWeight: 500, color: "#fff", marginBottom: 8 }}>{title}</div>
+                    <div style={{ fontWeight: 500, color: "#ccc", marginBottom: 8 }}>{title}</div>
                     {meta.description && (
                         <div style={{ marginBottom: 8, color: "#ccc", fontSize: 12 }}>
                             {meta.description}
@@ -258,7 +258,7 @@ function ForceLoadChannelsButton() {
     };
 
     return (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
             <Button
                 onClick={handleClick}
                 style={{
@@ -266,17 +266,140 @@ function ForceLoadChannelsButton() {
                     borderRadius: 6,
                     fontWeight: 600,
                     cursor: "pointer",
+                    marginBottom: 8,
                 }}
             >
                 Force-load Monitored Channels
             </Button>
-
-            <Forms.FormText style={{ marginTop: 6, color: "#ccc" }}>
+            <div style={{ color: "#ccc", fontSize: 12 }}>
                 Navigates to all monitored channels sequentially to force-load their data, then returns to the original channel.
-            </Forms.FormText>
+            </div>
         </div>
     );
 }
+
+function CloseRobloxButton() {
+    const handleClick = async () => {
+        try {
+            const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
+                getRobloxProcess: () => Promise<void>;
+                closeRoblox: () => Promise<void>;
+            };
+            const proc = await Native.getRobloxProcess() as any;
+
+            if (!proc) {
+                const toast = Toasts.create("Roblox is not running.", Toasts.Type.MESSAGE, {
+                    duration: 1000,
+                    position: Toasts.Position.BOTTOM,
+                });
+                Toasts.show(toast);
+                return;
+            }
+
+            await Native.closeRoblox();
+
+            const toast = Toasts.create(
+                `Closed Roblox process (${proc.name} - PID ${proc.pid}).`,
+                Toasts.Type.SUCCESS,
+                {
+                    duration: 1500,
+                    position: Toasts.Position.BOTTOM,
+                }
+            );
+            Toasts.show(toast);
+        } catch (err) {
+            const toast = Toasts.create("Failed to close Roblox.", Toasts.Type.FAILURE, {
+                duration: 2000,
+                position: Toasts.Position.BOTTOM,
+            });
+            Toasts.show(toast);
+        }
+    };
+
+    return (
+        <div style={{ marginBottom: 20 }}>
+            <Button
+                onClick={handleClick}
+                style={{
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    marginBottom: 8,
+                    backgroundColor: "#e5534b",
+                    color: "#fff",
+                }}
+            >
+                Close Roblox
+            </Button>
+            <div style={{ color: "#ccc", fontSize: 12 }}>
+                Attempts to gracefully close the Roblox process if it’s running. Works only on Windows.
+            </div>
+        </div>
+    );
+}
+
+function GetRobloxButton() {
+    const handleClick = async () => {
+        try {
+            const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
+                getRobloxProcess: () => Promise<void>;
+            };
+            const proc = await Native.getRobloxProcess() as any;
+
+            if (!proc) {
+                Toasts.show(
+                    Toasts.create("Roblox is not running.", Toasts.Type.MESSAGE, {
+                        duration: 1000,
+                        position: Toasts.Position.BOTTOM,
+                    })
+                );
+                return;
+            }
+
+            Toasts.show(
+                Toasts.create(
+                    `Roblox is running (${proc.name} - PID ${proc.pid})`,
+                    Toasts.Type.SUCCESS,
+                    {
+                        duration: 1500,
+                        position: Toasts.Position.BOTTOM,
+                    }
+                )
+            );
+        } catch (err) {
+            Toasts.show(
+                Toasts.create("Failed to get Roblox process.", Toasts.Type.FAILURE, {
+                    duration: 2000,
+                    position: Toasts.Position.BOTTOM,
+                })
+            );
+        }
+    };
+
+    return (
+        <div style={{ marginBottom: 20 }}>
+            <Button
+                onClick={handleClick}
+                style={{
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    marginBottom: 8,
+                    backgroundColor: "#4c8ae8",
+                    color: "#fff",
+                }}
+            >
+                Get Roblox
+            </Button>
+            <div style={{ color: "#ccc", fontSize: 12 }}>
+                Checks if the Roblox process is running and shows basic info.
+            </div>
+        </div>
+    );
+}
+
 
 // -------------------------------
 
@@ -321,12 +444,16 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <SectionTitle>Monitored Channels</SectionTitle>
                 <Setting setting="monitorChannelList" />
                 <Setting setting="monitorBlockedUserList" />
+                <ForceLoadChannelsButton />
 
                 <SectionTitle>Other Settings</SectionTitle>
                 <Setting setting="uiShortcutAction" />
+
+                <SectionTitle>Developer Settings</SectionTitle>
                 <Setting setting="_dev_dedupe_link_cooldown_ms" />
                 <Setting setting="_dev_verification_fail_fallback_delay_ms" />
-                <ForceLoadChannelsButton />
+                <GetRobloxButton />
+                <CloseRobloxButton />
 
             </ModalContent>
 

@@ -28,8 +28,8 @@ const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channe
             .filter(Boolean)
     );
 
-    log.warn("[patchChannelContextMenu] Config:", config);
-    log.warn("[patchChannelContextMenu] Monitored channels:", monitoredChannels);
+    // log.warn("[patchChannelContextMenu] Config:", config);
+    // log.warn("[patchChannelContextMenu] Monitored channels:", monitoredChannels);
 
     const isMonitored = monitoredChannels.has(channel.id);
 
@@ -478,17 +478,18 @@ export default definePlugin({
         // Should we join automatically?
         if (this.config!.joinEnabled) {
             const { isSafe, joinHappened } = await this.join(link);
+            const wasVerified = this.config!.verifyMode !== "none";
 
             // se o join aconteceu, e o servidor era inseguro, entao o usuário foi movido
             // se o join aconteceu, e o servidor era seguro, tudo bem, continue
             // se o join nao aconteceu, e o servidor era seguro, tudo bem, continue (nao tem como isso acontecer atualmente)
             // se o join nao aconteceu, e o servidor era inseguro, tudo bem, continue
 
-            if (!isSafe && this.config!.monitorBlockUnsafeServerMessageAuthors) {
+            if (wasVerified && !isSafe && this.config!.monitorBlockUnsafeServerMessageAuthors) {
                 this.config!.monitorBlockedUserList += `,${authorId}`;
             }
 
-            if (joinHappened && !isSafe) {
+            if (wasVerified && joinHappened && !isSafe) {
                 const title = "⚠️ SAJ :: Bad server!";
                 const body = [
                     "The link you just tried to join was unsafe. You have been moved to a safe server. Click on this notification to copy the message link.",
@@ -503,7 +504,7 @@ export default definePlugin({
                 return;
             }
 
-            if (!joinHappened && !isSafe) {
+            if (wasVerified && !joinHappened && !isSafe) {
                 log.warn(`⚠️ Link ${link.code} was blocked.`);
                 return;
             }
@@ -514,6 +515,16 @@ export default definePlugin({
 
         // Should we notify it?
         if (shouldNotifyThisMessage) {
+
+            // @FIXME ugly but will do for now. should verify before attempting joins/notifications, instead
+            if (this.config!.verifyMode !== "none" && !this.config!.joinEnabled) {
+                const { allowed, message } = await this.isSafeLink(link);
+                if (!allowed) {
+                    log.warn(`[handleNewMessage.shouldNotifyThisMessage] ⚠️ Link verification failed: ${message}`);
+                    return;
+                }
+            }
+
             const title = `🎯 SAJ :: Detected ${biome}`;
             const body = [
                 `Server: ${link.code} (${link.type})`,

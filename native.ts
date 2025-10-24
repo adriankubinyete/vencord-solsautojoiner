@@ -4,42 +4,85 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { exec } from "child_process";
+import { exec as execCb } from "child_process";
 import { IpcMainInvokeEvent } from "electron";
+import { promisify } from "util";
+
+const exec = promisify(execCb);
+
+export type RobloxProcessInfo = {
+  pid: number;
+  name: string;
+  path: string;
+};
+
+export async function getRobloxProcess(): Promise<RobloxProcessInfo | null> {
+  if (process.platform !== "win32") {
+    throw new Error("Unsupported platform: only Windows is supported");
+  }
+
+  try {
+    const ps = "powershell -NoProfile -Command \"Get-Process -Name RobloxPlayerBeta -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,Path | ConvertTo-Json -Compress\"";
+    const { stdout } = await exec(ps);
+    const s = (stdout || "").trim();
+    if (!s) return null;
+
+    const parsed = JSON.parse(s);
+    const entry = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!entry || !entry.Id) return null;
+
+    return {
+      pid: Number(entry.Id),
+      name: entry.ProcessName ?? "RobloxPlayerBeta",
+      path: entry.Path ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function isRobloxOpen(_: IpcMainInvokeEvent): Promise<boolean> {
+  if (process.platform !== "win32") {
+    throw new Error("Unsupported platform: only Windows is supported");
+  }
+
+  const proc = await getRobloxProcess();
+  return proc !== null;
+}
+
+export async function closeRoblox(_: IpcMainInvokeEvent,): Promise<void> {
+  if (process.platform !== "win32") {
+    throw new Error("Unsupported platform: only Windows is supported");
+  }
+
+  try {
+    // graceful stop
+    const ps = "powershell -NoProfile -Command \"Stop-Process -Name RobloxPlayerBeta -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 200; if (Get-Process -Name RobloxPlayerBeta -ErrorAction SilentlyContinue) { Stop-Process -Name RobloxPlayerBeta -Force -ErrorAction SilentlyContinue }\"";
+    await exec(ps);
+  } catch {
+    try {
+      await exec("taskkill /IM RobloxPlayerBeta.exe /F");
+    } catch {
+      // swallow silently
+    }
+  }
+}
 
 export async function openRoblox(
-    _: IpcMainInvokeEvent,
-    uri: string
+  _: IpcMainInvokeEvent,
+  uri: string
 ): Promise<void> {
-    const { platform } = process;
-    let command: string;
+  if (process.platform !== "win32") {
+    throw new Error("Unsupported platform: only Windows is supported");
+  }
 
-    switch (platform) {
-        case "win32":
-            command = `start "" "${uri}"`;
-            break;
-        case "darwin":
-            command = `open "${uri}"`;
-            break;
-        default:
-            command = `xdg-open "${uri}"`;
-            break;
-    }
+  const command = `start "" "${uri}"`;
 
-    return new Promise<void>((resolve, reject) => {
-        let spawned = false;
-
-        const child = exec(command, (error, stdout, stderr) => {
-            if (!spawned) return reject(new Error("Process failed to spawn"));
-            if (error) return reject(error);
-            resolve();
-        });
-
-        child.on("spawn", () => {
-            spawned = true;
-        });
-
-    });
+  try {
+    await exec(command);
+  } catch (error) {
+    throw new Error(`Failed to start Roblox: ${(error as Error).message}`);
+  }
 }
 
 export async function fetchRobloxCsrf(_: IpcMainInvokeEvent, token: string): Promise<{ status: number; csrf: string | null }> {
