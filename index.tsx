@@ -14,7 +14,7 @@ import { JoinerChatBarIcon } from "./JoinerIcon";
 import { BiomeSettings, BiomesKeywords, JoinerSettings, settings } from "./settings";
 import { createLogger } from "./utils";
 
-const logger = createLogger("SolsAutoJoiner");
+const baselogger = createLogger("SolsAutoJoiner");
 
 // logo acima do export default
 const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channel }) => {
@@ -76,7 +76,7 @@ export default definePlugin({
      */
 
     async preloadMonitoredChannels(monitored: Set<string>) {
-        const log = logger.inherit("preloadMonitoredChannels");
+        const log = baselogger.inherit("preloadMonitoredChannels");
         if (!monitored.size) return;
 
         for (const channelId of monitored) {
@@ -95,7 +95,7 @@ export default definePlugin({
     },
 
     start() {
-        const log = logger.inherit("start");
+        const log = baselogger.inherit("start");
         // Carrega a configuração do plugin
         const config = Settings.plugins.SolsAutoJoiner as unknown as JoinerSettings;
         this.config = config;
@@ -124,7 +124,7 @@ export default definePlugin({
     },
 
     stop() {
-        const log = logger.inherit("stop");
+        const log = baselogger.inherit("stop");
         if (this.boundHandler) FluxDispatcher.unsubscribe("MESSAGE_CREATE", this.boundHandler);
         this.boundHandler = null;
         this.config = null;
@@ -151,7 +151,7 @@ export default definePlugin({
         return this.config!.monitorBlockedUserList.split(",").map(x => x.trim()).includes(userId);
     },
 
-    getLinkFromMessageContent(content: string): { ok: true; type: "share" | "private"; link: string; code: string; placeId?: string } | { ok: false; reason: "no-content" | "ambiguous" | "no-match" } {
+    getLinkFromMessageContent(content: string): { ok: true; type: "share" | "private"; link: string; code: string; placeId?: string } | { ok: false; reason: "no-content" | "ambiguous" | "message-has-no-match" } {
         if (!content?.trim()) return { ok: false, reason: "no-content" };
 
         const normalized = content.toLowerCase();
@@ -166,7 +166,7 @@ export default definePlugin({
         if (hasShare && hasPrivate) return { ok: false, reason: "ambiguous" };
 
         const match = shareMatch ?? privateMatch;
-        if (!match) return { ok: false, reason: "no-match" };
+        if (!match) return { ok: false, reason: "message-has-no-match" };
 
         return {
             ok: true,
@@ -221,7 +221,7 @@ export default definePlugin({
     },
 
     // true if join was successful, false otherwise (currently means join is unsafe)
-    async joinLink(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }, logger: any = createLogger("log")): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
+    async joinLink(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }, logger: any = createLogger("")): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
         const log = logger.inherit("joinLink");
         const verifyMode = this.config!.verifyMode || "none";
         const fallbackActionDelayMs = this.config!.verifyAfterJoinFailFallbackDelayMs || 5000;
@@ -330,13 +330,14 @@ export default definePlugin({
             const nativeStart = performance.now();
             if (shouldCloseGameBefore) await this.closeRoblox(log);
             await Native.openRoblox(uri);
-            log.perf(`Launched Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`);
+            // please forgive me for this
+            log.perf(`${ shouldCloseGameBefore ? "Closed and l" : "L" }aunched Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`); // this fkn ternary is funny as hell for me lmfao
         } catch (err) {
             log.error("⚠️ Failed to open Roblox link:", err);
         }
     },
 
-    async resolveShareCode(shareCode: string): Promise<{ placeId: string; } | undefined> {
+    async resolveShareCode(shareCode: string, logger = createLogger("log")): Promise<{ placeId: string; } | undefined> {
         const log = logger.inherit("resolveShareCode");
         try {
             log.debug(`Resolving share code ${shareCode}`);
@@ -396,7 +397,6 @@ export default definePlugin({
     },
 
     async isSafeLink(link: { link: string; type: "share" | "private" | "public"; code: string; placeId?: string; }): Promise<{ allowed: boolean; message: string; }> {
-        const log = logger.inherit("isSafeLink");
         let { placeId } = link;
 
         // --- PRIVATE SERVER LINKS ---
@@ -420,9 +420,6 @@ export default definePlugin({
         if (link.type === "share") {
             const resolved = await this.resolveShareCode(link.code);
             placeId = resolved?.placeId;
-
-            log.trace(`Resolved PlaceId: ${placeId}`);
-            log.trace(`Type of resolved placeid: ${typeof placeId}`);
 
             if (!placeId) {
                 return { allowed: false, message: "Failed to resolve placeId from share link." };
@@ -463,7 +460,7 @@ export default definePlugin({
     */
 
     async handleNewMessage(data: { channelId: string; message: any; }) {
-        const log = logger.inherit(`${data?.message?.id}.handleNewMessage`);
+        const log = baselogger.inherit(`${data?.message?.id}.handleNewMessage`);
         const msgStart = performance.now();
         const timeTaken = () => `${(performance.now() - msgStart).toFixed(2)}ms`;
 
