@@ -240,7 +240,7 @@ export default definePlugin({
         }
 
         log.debug(`Joining link: ${link.link}`);
-        await this.openRoblox(link, true);
+        await this.openRoblox(link, log);
         joinHappened = true;
 
         if (verifyMode === "after") {
@@ -258,8 +258,9 @@ export default definePlugin({
         return { isSafe, joinHappened };
     },
 
-    async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }, closeBefore?: boolean): Promise<void> {
+    async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }, logger: any = createLogger("log")): Promise<void> {
         const log = logger.inherit("openRoblox");
+        const shouldCloseGameBefore = this.config!.joinCloseGameBefore || true;
         const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
             openRoblox: (uri: string) => Promise<void>;
             closeRoblox: () => Promise<void>;
@@ -305,7 +306,7 @@ export default definePlugin({
 
         try {
             const nativeStart = performance.now();
-            if (closeBefore) await Native.closeRoblox();
+            if (shouldCloseGameBefore) await Native.closeRoblox();
             log.perf(`[native] closeRoblox took ${performance.now() - nativeStart}ms`);
             await Native.openRoblox(uri);
             log.perf(`[native] openRoblox took ${performance.now() - nativeStart}ms`);
