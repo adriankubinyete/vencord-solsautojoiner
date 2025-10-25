@@ -11,7 +11,7 @@ import definePlugin from "@utils/types";
 import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu, NavigationRouter } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
-import { BiomeSettings, BiomesKeywords, JoinerSettings, settings } from "./settings";
+import { JoinerSettings, settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
 import { createLogger } from "./utils";
 
 const baselogger = createLogger("SolsAutoJoiner");
@@ -206,10 +206,10 @@ export default definePlugin({
         return { isProcessable: true, cooldown: null };
     },
 
-    detectBiomeKeywords(text: string): string[] {
+    detectTriggerKeywords(text: string): string[] {
         const normalized = text.toLowerCase();
-        return Object.entries(BiomesKeywords)
-            .filter(([biome]) => this.config![biome as keyof BiomeSettings])
+        return Object.entries(TriggerKeywords)
+            .filter(([biome]) => this.config![biome as keyof TriggerKeywordSettings])
             .filter(([_, keywords]) =>
                 keywords.some(kw => {
                     // eslint-disable-next-line @stylistic/quotes
@@ -513,7 +513,7 @@ export default definePlugin({
         }
 
         // What biome is it?
-        const biomesMatched = this.detectBiomeKeywords(content);
+        const biomesMatched = this.detectTriggerKeywords(content);
         const biome = biomesMatched?.[0];
         if (biomesMatched.length === 0) {
             log.info(`❌ ${link.code} (${link.type}) did not match any enabled biome. (at +${timeTaken()})`);

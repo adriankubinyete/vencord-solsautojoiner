@@ -12,22 +12,40 @@ import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } fr
 import { OptionType } from "@utils/types";
 import { ChannelRouter, ChannelStore, Forms, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
 
-import { BiomeSettings, BiomesKeywords, settings } from "./settings";
+import { settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
 import { cl, getSettingMeta } from "./utils";
 
-function Note({ children }: { children: React.ReactNode; }) {
+function Note({
+    children,
+    style,
+}: {
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+}) {
+    const defaultStyle: React.CSSProperties = {
+        borderLeft: "2px solid #888",
+        paddingLeft: 8,
+        color: "#aaa",
+        fontSize: 13,
+        lineHeight: 1.4,
+        marginTop: -15,
+        marginBottom: 4,
+    };
+
+    return <div style={{ ...defaultStyle, ...style }}>{children}</div>;
+}
+
+function SectionHorizontalLine() {
     return (
-        <div style={{
-            borderLeft: "2px solid #888",
-            paddingLeft: 8,
-            color: "#aaa",
-            fontSize: 13,
-            lineHeight: 1.4,
-            marginTop: -15,
-            marginBottom: 4,
-        }}>
-            {children}
-        </div>
+        <hr
+            style={{
+                border: "none",
+                borderTop: "1px solid #555",
+                marginTop: 12,
+                marginBottom: 12,
+                width: "100%",
+            }}
+        />
     );
 }
 
@@ -439,6 +457,8 @@ function DebugButton() {
 // -------------------------------
 
 export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
+    // make uiShowKeywords dynamic
+    const reactive = settings.use(["uiShowKeywords"]);
     return (
         <ModalRoot {...rootProps}>
             <ModalHeader className={cl("modal-header")}>
@@ -453,15 +473,32 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <Setting setting="joinEnabled" />
                 <Setting setting="notifyEnabled" />
 
-                <SectionTitle>Biomes</SectionTitle>
-                {(Object.keys(BiomesKeywords) as (keyof BiomeSettings)[]).map(biomeKey => (
-                    <Setting
-                        key={biomeKey}
-                        setting={biomeKey}
-                        customTitle={biomeKey}
-                        style={{ marginBottom: 12 }}
-                    />
-                ))}
+                <SectionTitle>Triggers</SectionTitle>
+                {(Object.keys(TriggerKeywords) as (keyof TriggerKeywordSettings)[]).map((triggerKey, index) => {
+                    const keywords = TriggerKeywords[triggerKey].join(", ");
+
+                    const style = !reactive.uiShowKeywords && index > 0 ? { marginTop: -10 } : undefined;
+
+                    return reactive.uiShowKeywords ? (
+                        <>
+                            <Setting
+                                setting={triggerKey}
+                                customTitle={triggerKey}
+                            />
+                            <Note style={{ marginTop: -20, marginBottom: 8 }}>
+                                {keywords}
+                            </Note>
+                        </>
+                    ) : (
+                        <Setting
+                            style={style}
+                            setting={triggerKey}
+                            customTitle={triggerKey}
+                        />
+                    );
+                })}
+                <SectionHorizontalLine />
+                <Setting setting="uiShowKeywords" />
 
                 <SectionTitle>Pre-Join Behavior</SectionTitle>
                 <Setting setting="joinCloseGameBefore" />
@@ -472,6 +509,7 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
 
                 <SectionTitle>Link Verification</SectionTitle>
                 <SectionMessage>All configurations listed here will only work if you have set a Roblosecurity token to resolve links. To configure a Roblosecurity token, navigate to the plugin's settings page.</SectionMessage>
+                <SectionHorizontalLine />
                 <Setting setting="verifyMode" />
                 <Note>Requires a Roblosecurity token set. Otherwise, does nothing.</Note>
                 <Setting setting="verifyAllowedPlaceIds" />
@@ -496,6 +534,7 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <Setting setting="_dev_logging_level" />
                 <Setting setting="_dev_dedupe_link_cooldown_ms" />
                 {/* <Setting setting="_dev_verification_fail_fallback_delay_ms" /> */}
+                <SectionHorizontalLine />
                 <DebugButton />
                 <GetRobloxButton />
                 <CloseRobloxButton />

@@ -66,6 +66,11 @@ export const settings = definePluginSettings({
             { label: "Toggle AutoJoin and Notifications", value: "toggleJoinAndNotifications" },
         ]
     },
+    uiShowKeywords: {
+        type: OptionType.BOOLEAN,
+        description: "Show keywords for triggers in the chat bar menu.",
+        default: true
+    },
 
     /*
     * Monitoring
@@ -152,6 +157,8 @@ export const settings = definePluginSettings({
     SNOWY: { type: OptionType.BOOLEAN, description: "", default: false },
     WINDY: { type: OptionType.BOOLEAN, description: "", default: false },
     RAINY: { type: OptionType.BOOLEAN, description: "", default: false },
+    MARI: { type: OptionType.BOOLEAN, description: "", default: false },
+    JESTER: { type: OptionType.BOOLEAN, description: "", default: false },
 
     /*
     * Developer options
@@ -205,7 +212,7 @@ export interface PluginSettings {
 }
 
 // Config dos biomes
-export interface BiomeSettings {
+export interface TriggerKeywordSettings {
     GLITCHED: boolean;
     DREAMSPACE: boolean;
     BLOODRAIN: boolean;
@@ -219,24 +226,28 @@ export interface BiomeSettings {
     SNOWY: boolean;
     WINDY: boolean;
     RAINY: boolean;
+    MARI: boolean;
+    JESTER: boolean;
 }
 
 // Junta plugin + biomes
-export type JoinerSettings = PluginSettings & BiomeSettings;
+export type JoinerSettings = PluginSettings & TriggerKeywordSettings;
 
 // Palavras-chave por biome
-export const BiomesKeywords: Record<keyof BiomeSettings, string[]> = {
+export const TriggerKeywords: Record<keyof TriggerKeywordSettings, string[]> = {
     GLITCHED: ["glitch", "glitched"],
     DREAMSPACE: ["dream", "dream space", "dreamspace"],
     BLOODRAIN: ["blood rain", "blood", "bloodrain"],
-    PUMPKINMOON: ["pump", "pumpkin", "pumpkin moon", "pmoon", "pumpkinmoon"],
+    PUMPKINMOON: ["pump", "pumpkin", "pmoon"],
     GRAVEYARD: ["grave", "graveyard", "grave yard"],
     NULL: ["null"],
-    CORRUPTION: ["corruption"],
+    CORRUPTION: ["corruption", "corrupt"],
     HELL: ["hell"],
     STARFALL: ["starfall", "star fall"],
     SANDSTORM: ["sand", "sand storm", "sandstorm"],
     SNOWY: ["snowy"],
     WINDY: ["windy"],
-    RAINY: ["rainy"]
+    RAINY: ["rainy"],
+    MARI: ["mari", "voidcoin", "void coin"],
+    JESTER: ["jester", "oblivion"],
 };
