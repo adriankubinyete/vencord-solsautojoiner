@@ -151,7 +151,7 @@ export default definePlugin({
         return this.config!.monitorBlockedUserList.split(",").map(x => x.trim()).includes(userId);
     },
 
-    getLinkFromMessageContent(content: string): { ok: true; type: "share" | "private"; link: string; code: string; placeId?: string } | { ok: false; reason: "no-content" | "ambiguous" | "message-has-no-match" } {
+    getLinkFromMessageContent(content: string): { ok: true; type: "share" | "private"; link: string; code: string; placeId?: string; } | { ok: false; reason: "no-content" | "ambiguous" | "message-has-no-match"; } {
         if (!content?.trim()) return { ok: false, reason: "no-content" };
 
         const normalized = content.toLowerCase();
@@ -270,22 +270,42 @@ export default definePlugin({
         return { isSafe, joinHappened };
     },
 
-    async closeRoblox(logger: any = createLogger("log")): Promise<void> {
+    async closeRoblox(logger: any = baselogger): Promise<void> {
         const log = logger.inherit("closeRoblox");
         const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
-            closeRoblox: () => Promise<void>;
+            getProcess: (processName: string) => Promise<{ pid: number; name: string; path?: string; }[]>;
+            killProcess: (pid: number) => Promise<void>;
         };
+
         const nativeStart = performance.now();
-        await Native.closeRoblox();
-        log.perf(`Closed Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`);
+        try {
+            log.trace("Attempting to close Roblox processes...");
+
+            const processes = await Native.getProcess("RobloxPlayerBeta");
+            if (!processes.length) {
+                log.debug("No Roblox process found.");
+            } else {
+                // kill ALL processes!
+                await Promise.all(
+                    processes.map(proc => {
+                        log.debug(`Killing Roblox process ${proc.pid} (${proc.name}) (path: ${proc.path})`);
+                        return Native.killProcess(proc.pid);
+                    })
+                );
+                log.debug(`Terminated ${processes.length} Roblox processes.`);
+            }
+        } catch (err) {
+            log.error("⚠️ Failed to close Roblox processes:", err);
+        } finally {
+            log.perf(`Closed Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`);
+        }
     },
 
     async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }, logger: any = createLogger("log")): Promise<void> {
         const log = logger.inherit("openRoblox");
         const shouldCloseGameBefore = this.config!.joinCloseGameBefore || true;
         const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
-            openRoblox: (uri: string) => Promise<void>;
-            closeRoblox: () => Promise<void>;
+            openUri: (uri: string) => Promise<void>;
         };
 
         if (!link?.type) {
@@ -329,9 +349,9 @@ export default definePlugin({
         try {
             const nativeStart = performance.now();
             if (shouldCloseGameBefore) await this.closeRoblox(log);
-            await Native.openRoblox(uri);
+            await Native.openUri(uri);
             // please forgive me for this
-            log.perf(`${ shouldCloseGameBefore ? "Closed and l" : "L" }aunched Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`); // this fkn ternary is funny as hell for me lmfao
+            log.perf(`${shouldCloseGameBefore ? "Closed and l" : "L"}aunched Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`); // this fkn ternary is funny as hell for me lmfao
         } catch (err) {
             log.error("⚠️ Failed to open Roblox link:", err);
         }
