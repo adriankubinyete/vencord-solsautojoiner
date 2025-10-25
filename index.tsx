@@ -221,7 +221,7 @@ export default definePlugin({
     },
 
     // true if join was successful, false otherwise (currently means join is unsafe)
-    async joinLink(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }, logger: any = createLogger("")): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
+    async joinLink(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }, logger: any = baselogger): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
         const log = logger.inherit("joinLink");
         const verifyMode = this.config!.verifyMode || "none";
         const fallbackActionDelayMs = this.config!.verifyAfterJoinFailFallbackDelayMs || 5000;
@@ -279,16 +279,16 @@ export default definePlugin({
 
         const nativeStart = performance.now();
         try {
-            log.trace("Attempting to close Roblox processes...");
+            log.debug("Attempting to close Roblox processes...");
 
             const processes = await Native.getProcess("RobloxPlayerBeta");
             if (!processes.length) {
-                log.debug("No Roblox process found.");
+                log.trace("No Roblox process found.");
             } else {
                 // kill ALL processes!
                 await Promise.all(
                     processes.map(proc => {
-                        log.debug(`Killing Roblox process ${proc.pid} (${proc.name}) (path: ${proc.path})`);
+                        log.trace(`Killing Roblox process ${proc.pid} (${proc.name}) (path: ${proc.path})`);
                         return Native.killProcess(proc.pid);
                     })
                 );
@@ -301,7 +301,7 @@ export default definePlugin({
         }
     },
 
-    async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }, logger: any = createLogger("log")): Promise<void> {
+    async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }, logger: any = baselogger): Promise<void> {
         const log = logger.inherit("openRoblox");
         const shouldCloseGameBefore = this.config!.joinCloseGameBefore || true;
         const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
@@ -357,7 +357,7 @@ export default definePlugin({
         }
     },
 
-    async resolveShareCode(shareCode: string, logger = createLogger("log")): Promise<{ placeId: string; } | undefined> {
+    async resolveShareCode(shareCode: string, logger = baselogger): Promise<{ placeId: string; } | undefined> {
         const log = logger.inherit("resolveShareCode");
         try {
             log.debug(`Resolving share code ${shareCode}`);
