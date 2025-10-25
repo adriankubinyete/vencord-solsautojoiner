@@ -232,7 +232,7 @@ export default definePlugin({
         log.debug(`Verification mode: ${verifyMode}}`);
 
         if (verifyMode === "before") {
-            const { allowed, message } = await this.isSafeLink(link);
+            const { allowed, message } = await this.isSafeLink(link, log);
             if (!allowed) {
                 log.warn(`⚠️ Link verification (before) failed: ${message}`);
                 return { isSafe, joinHappened };
@@ -245,7 +245,7 @@ export default definePlugin({
         joinHappened = true;
 
         if (verifyMode === "after") {
-            const { allowed, message } = await this.isSafeLink(link);
+            const { allowed, message } = await this.isSafeLink(link, log);
             if (!allowed) {
                 log.warn(`⚠️ Link verification (after) failed: ${message}`);
                 log.debug(`Waiting ${fallbackActionDelayMs}ms before fallback action...`);
@@ -359,6 +359,7 @@ export default definePlugin({
 
     async resolveShareCode(shareCode: string, logger = baselogger): Promise<{ placeId: string; } | undefined> {
         const log = logger.inherit("resolveShareCode");
+        const resolveStart = performance.now();
         try {
             log.debug(`Resolving share code ${shareCode}`);
 
@@ -377,7 +378,7 @@ export default definePlugin({
             // 1️⃣ Busca CSRF token
             const { status: csrfStatus, csrf } = await Native.fetchRobloxCsrf(token);
             // status 403 expected
-            log.debug(`CSRF - Status: ${csrfStatus || null}`);
+            log.trace(`CSRF - Status: ${csrfStatus || null}`);
 
             if (!csrf) {
                 log.warn(`Failed to fetch CSRF token for share code ${shareCode}`);
@@ -386,7 +387,7 @@ export default definePlugin({
 
             // 2️⃣ Resolve o share link usando o CSRF
             const { status, data } = await Native.resolveRobloxShareLink(token, csrf, shareCode);
-            log.debug(` Status: ${status}, Data:`, data);
+            log.trace(` Status: ${status}, Data:`, data);
 
             if (!data || status !== 200) {
                 log.error(` Failed to resolve share code ${shareCode}`);
@@ -400,14 +401,15 @@ export default definePlugin({
             }
 
             const serverData = data?.privateServerInviteData;
-            log.debug("server data:", serverData);
+            log.trace("Server data:", serverData);
 
             if (serverData?.status !== "Valid") {
-                log.warn(`Share code ${shareCode} is not valid.`);
+                log.trace(`Share code ${shareCode} is not valid.`);
                 return undefined;
             }
 
-            log.info(`Share code ${shareCode} resolved successfully: placeId=${serverData.placeId}`);
+            log.trace(`Share code ${shareCode} resolved successfully: placeId=${serverData.placeId}`);
+            log.perf(`Resolved share code ${shareCode} in ${(performance.now() - resolveStart).toFixed(2)}ms.`);
             const stringifiedPlaceId = serverData.placeId.toString();
             return { placeId: stringifiedPlaceId };
         } catch (err) {
@@ -416,8 +418,9 @@ export default definePlugin({
         }
     },
 
-    async isSafeLink(link: { link: string; type: "share" | "private" | "public"; code: string; placeId?: string; }): Promise<{ allowed: boolean; message: string; }> {
+    async isSafeLink(link: { link: string; type: "share" | "private" | "public"; code: string; placeId?: string; }, logger = baselogger): Promise<{ allowed: boolean; message: string; }> {
         let { placeId } = link;
+        const log = logger.inherit("isSafeLink");
 
         // --- PRIVATE SERVER LINKS ---
         if (link.type === "private") {
@@ -438,7 +441,7 @@ export default definePlugin({
 
         // --- SHARE LINKS ---
         if (link.type === "share") {
-            const resolved = await this.resolveShareCode(link.code);
+            const resolved = await this.resolveShareCode(link.code, log);
             placeId = resolved?.placeId;
 
             if (!placeId) {
@@ -520,12 +523,14 @@ export default definePlugin({
             log.warn(`⚠️ ${link.code} (${link.type}) matched multiple biomes: ${biomesMatched.join(", ")} — ignoring due to ambiguity. (at +${timeTaken()})`);
             return;
         }
-        log.info(`✅ Code ${link.code} (${link.type}) matched biome: ${biome} (at +${timeTaken()})`);
+        log.debug(`✅ Code ${link.code} (${link.type}) matched biome: ${biome} (at +${timeTaken()})`);
 
         const shouldNotifyThisMessage = this.config!.notifyEnabled; // snapshot the value before autojoin, because it MIGHT disable from this.config directly
+        const snapshotJoinEnabled = this.config!.joinEnabled;
 
         // Should we join automatically?
         if (this.config!.joinEnabled) {
+            log.info(`🎯 ${link.code} Starting join... (at +${timeTaken()})`);
             const { isSafe, joinHappened } = await this.joinLink(link, log);
             const wasVerified = this.config!.verifyMode !== "none";
 
@@ -550,11 +555,12 @@ export default definePlugin({
                     await copyToClipboard(messageUrl);
                 };
                 this.sendNotification(title, body, onClick);
+                log.warn(`⚠️ ${link.code} was a bad server... (at +${timeTaken()})`);
                 return;
             }
 
             if (wasVerified && !joinHappened && !isSafe) {
-                log.warn(`⚠️ Link ${link.code} was blocked.`);
+                log.warn(`⚠️ ${link.code} was blocked.`);
                 return;
             }
 
@@ -566,10 +572,10 @@ export default definePlugin({
         if (shouldNotifyThisMessage) {
 
             // @FIXME ugly but will do for now. should verify before attempting joins/notifications, instead
-            if (this.config!.verifyMode !== "none" && !this.config!.joinEnabled) {
-                const { allowed, message } = await this.isSafeLink(link);
+            if (this.config!.verifyMode !== "none" && !snapshotJoinEnabled) {
+                const { allowed, message } = await this.isSafeLink(link, log);
                 if (!allowed) {
-                    log.warn(`[handleNewMessage.shouldNotifyThisMessage] ⚠️ Link verification failed: ${message}`);
+                    log.warn(`⚠️ ${link.code} Link verification failed: ${message}`);
                     return;
                 }
             }
@@ -584,6 +590,7 @@ export default definePlugin({
                 this.joinLink(link, log);
             };
             this.sendNotification(title, body, onClick);
+            log.info(`✅ ${link.code} Notification sent. (at +${timeTaken()})`);
         }
         log.trace(`Finished (at +${timeTaken()})`);
     },
