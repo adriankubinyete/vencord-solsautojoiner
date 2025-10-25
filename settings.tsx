@@ -125,6 +125,15 @@ export const settings = definePluginSettings({
         description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
         default: 5000
     },
+    verifyAfterJoinFailFallbackAction: {
+        type: OptionType.SELECT,
+        description: "Action to execute when verification after joining fails.",
+        default: "joinSols",
+        options: [
+            { label: "Join Sol's RNG public server", value: "joinSols" },
+            { label: "Quit game", value: "quit" },
+        ]
+    },
 
     /*
     * Biome detection
@@ -190,9 +199,9 @@ export interface PluginSettings {
     verifyAllowedPlaceIds: string;
     verifyBlockedPlaceIds: string;
     verifyAfterJoinFailFallbackDelayMs: number;
+    verifyAfterJoinFailFallbackAction: "joinSols" | "quit";
     _dev_logging_level: "trace" | "debug" | "perf" | "info" | "warn" | "error";
     _dev_dedupe_link_cooldown_ms: number;
-    _dev_verification_fail_fallback_delay_ms: number;
 }
 
 // Config dos biomes

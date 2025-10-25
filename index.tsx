@@ -224,7 +224,8 @@ export default definePlugin({
     async joinLink(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }, logger: any = createLogger("log")): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
         const log = logger.inherit("joinLink");
         const verifyMode = this.config!.verifyMode || "none";
-        const fallbackActionDelayMs = this.config!._dev_verification_fail_fallback_delay_ms || 5000;
+        const fallbackActionDelayMs = this.config!.verifyAfterJoinFailFallbackDelayMs || 5000;
+        const fallbackAction = this.config!.verifyAfterJoinFailFallbackAction || "joinSols";
         let isSafe = false;
         let joinHappened = false;
 
@@ -249,13 +250,34 @@ export default definePlugin({
                 log.warn(`⚠️ Link verification (after) failed: ${message}`);
                 log.debug(`Waiting ${fallbackActionDelayMs}ms before fallback action...`);
                 await new Promise(res => setTimeout(res, fallbackActionDelayMs));
-                await this.openRoblox({ type: "public", placeId: "15532962292" });
+
+                switch (fallbackAction) {
+                    case "joinSols":
+                        await this.openRoblox({ type: "public", placeId: "15532962292" });
+                        break;
+                    case "quit":
+                        await this.closeRoblox();
+                        break;
+                    default:
+                        log.error(`Unknown fallback action: ${fallbackAction}`);
+                        break;
+                }
                 return { isSafe, joinHappened };
             }
             isSafe = true;
         }
 
         return { isSafe, joinHappened };
+    },
+
+    async closeRoblox(logger: any = createLogger("log")): Promise<void> {
+        const log = logger.inherit("closeRoblox");
+        const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
+            closeRoblox: () => Promise<void>;
+        };
+        const nativeStart = performance.now();
+        await Native.closeRoblox();
+        log.perf(`Closed Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`);
     },
 
     async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }, logger: any = createLogger("log")): Promise<void> {
@@ -306,11 +328,9 @@ export default definePlugin({
 
         try {
             const nativeStart = performance.now();
-            if (shouldCloseGameBefore) await Native.closeRoblox();
-            log.perf(`[native] closeRoblox took ${performance.now() - nativeStart}ms`);
+            if (shouldCloseGameBefore) await this.closeRoblox(log);
             await Native.openRoblox(uri);
-            log.perf(`[native] openRoblox took ${performance.now() - nativeStart}ms`);
-            log.debug("Roblox process spawned successfully.");
+            log.perf(`Launched Roblox in ${(performance.now() - nativeStart).toFixed(2)}ms.`);
         } catch (err) {
             log.error("⚠️ Failed to open Roblox link:", err);
         }

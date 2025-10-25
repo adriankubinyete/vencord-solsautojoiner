@@ -453,12 +453,6 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <Setting setting="joinEnabled" />
                 <Setting setting="notifyEnabled" />
 
-                <SectionTitle>Post-Join Behavior</SectionTitle>
-                <Setting setting="joinDisableAfterAutoJoin" />
-                <Setting setting="notifyDisableAfterAutoJoin" />
-                <Setting setting="verifyMode" />
-                <Note>Requires a Roblosecurity token set. Otherwise, does nothing.</Note>
-
                 <SectionTitle>Biomes</SectionTitle>
                 {(Object.keys(BiomesKeywords) as (keyof BiomeSettings)[]).map(biomeKey => (
                     <Setting
@@ -469,12 +463,22 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                     />
                 ))}
 
+                <SectionTitle>Pre-Join Behavior</SectionTitle>
+                <Setting setting="joinCloseGameBefore" />
+
+                <SectionTitle>Post-Join Behavior</SectionTitle>
+                <Setting setting="joinDisableAfterAutoJoin" />
+                <Setting setting="notifyDisableAfterAutoJoin" />
+
                 <SectionTitle>Link Verification</SectionTitle>
                 <SectionMessage>All configurations listed here will only work if you have set a Roblosecurity token to resolve links. To configure a Roblosecurity token, navigate to the plugin's settings page.</SectionMessage>
-                <Setting setting="verifyMode" /> {/* Yes, yes, I know this is duplicated */}
+                <Setting setting="verifyMode" />
+                <Note>Requires a Roblosecurity token set. Otherwise, does nothing.</Note>
                 <Setting setting="verifyAllowedPlaceIds" />
                 <Setting setting="verifyBlockedPlaceIds" />
                 <Setting setting="monitorBlockUnsafeServerMessageAuthors" />
+                <Setting setting="verifyAfterJoinFailFallbackAction" />
+                <Setting setting="verifyAfterJoinFailFallbackDelayMs" />
 
                 <SectionTitle>Monitored Channels</SectionTitle>
                 <Setting setting="monitorChannelList" />
@@ -483,7 +487,6 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
 
                 <SectionTitle>Other Settings</SectionTitle>
                 <Setting setting="uiShortcutAction" />
-                <Setting setting="joinCloseGameBefore" />
                 <Note>
                     This makes your join about 1 second slower, but ✨hopefully✨ prevents the game from simply not launching at all. If you want faster joins, disable this and close your game manually before every join.
                 </Note>
@@ -492,7 +495,7 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <SectionTitle>Developer Settings</SectionTitle>
                 <Setting setting="_dev_logging_level" />
                 <Setting setting="_dev_dedupe_link_cooldown_ms" />
-                <Setting setting="_dev_verification_fail_fallback_delay_ms" />
+                {/* <Setting setting="_dev_verification_fail_fallback_delay_ms" /> */}
                 <DebugButton />
                 <GetRobloxButton />
                 <CloseRobloxButton />
