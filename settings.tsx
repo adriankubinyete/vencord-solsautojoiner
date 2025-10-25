@@ -28,6 +28,11 @@ export const settings = definePluginSettings({
         description: "Send a desktop notification when a valid Roblox share link is detected.",
         default: false
     },
+    joinCloseGameBefore: {
+        type: OptionType.BOOLEAN,
+        description: "Close the game before joining. Makes your joins slightly slower.",
+        default: true
+    },
 
     /*
     * After-Join behavior
@@ -149,6 +154,7 @@ export const settings = definePluginSettings({
        options: [
            { label: "Trace", value: "trace" },
            { label: "Debug", value: "debug" },
+           { label: "Performance", value: "perf" },
            { label: "Info", value: "info" },
            { label: "Warn", value: "warn" },
            { label: "Error", value: "error" },
@@ -170,6 +176,7 @@ export const settings = definePluginSettings({
 export interface PluginSettings {
     joinEnabled: boolean;
     notifyEnabled: boolean;
+    joinCloseGameBefore: boolean;
     joinDisableAfterAutoJoin: boolean;
     notifyDisableAfterAutoJoin: boolean;
     uiShowChatBarIcon: boolean;
@@ -183,6 +190,7 @@ export interface PluginSettings {
     verifyAllowedPlaceIds: string;
     verifyBlockedPlaceIds: string;
     verifyAfterJoinFailFallbackDelayMs: number;
+    _dev_logging_level: "trace" | "debug" | "perf" | "info" | "warn" | "error";
     _dev_dedupe_link_cooldown_ms: number;
     _dev_verification_fail_fallback_delay_ms: number;
 }

@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { findGroupChildrenByChildId,NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { Settings } from "@api/Settings";
 import { copyToClipboard } from "@utils/clipboard";
 import definePlugin from "@utils/types";
-import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu,NavigationRouter } from "@webpack/common";
+import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu, NavigationRouter } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
 import { BiomeSettings, BiomesKeywords, JoinerSettings, settings } from "./settings";
@@ -151,48 +151,43 @@ export default definePlugin({
         return this.config!.monitorBlockedUserList.split(",").map(x => x.trim()).includes(userId);
     },
 
-    getLinkFromMessageContent(content: string) {
-        const log = logger.inherit("getLinkFromMessageContent");
-        if (!content?.trim()) return null;
+    getLinkFromMessageContent(content: string): { ok: true; type: "share" | "private"; link: string; code: string; placeId?: string } | { ok: false; reason: "no-content" | "ambiguous" | "no-match" } {
+        if (!content?.trim()) return { ok: false, reason: "no-content" };
 
         const normalized = content.toLowerCase();
 
         const shareMatch = /https?:\/\/(?:www\.)?roblox\.com\/share\?code=([a-f0-9]+)/i.exec(normalized);
         const privateMatch = /https?:\/\/(?:www\.)?roblox\.com\/games\/(\d+)(?:\/[^?]*)?\?privateserverlinkcode=([a-f0-9]+)/i.exec(normalized);
 
-        // https://www.roblox.com/games/15532962292?privateServerLinkCode=10797789767819061560477789923716
-        // placeid = 15532962292
-
         const hasShare = Boolean(shareMatch);
         const hasPrivate = Boolean(privateMatch);
 
-        if (hasShare && hasPrivate) {
-            log.warn("⚠️ Both a share link and a private server link found in the same message — ignoring due to ambiguity.");
-            return null;
-        }
+        // Ignore ambiguous messages with both link types
+        if (hasShare && hasPrivate) return { ok: false, reason: "ambiguous" };
 
         const match = shareMatch ?? privateMatch;
-        if (!match) return null;
+        if (!match) return { ok: false, reason: "no-match" };
 
         return {
-            type: hasShare ? "share" as const : "private" as const,
+            ok: true,
+            type: hasShare ? "share" : "private",
             link: match[0],
             code: hasShare ? match[1] : match[2],
-            placeid: hasPrivate ? match[1] : undefined
+            placeId: hasPrivate ? match[1] : undefined,
         };
     },
 
-    isLinkCodeOnCooldown(code: string): boolean {
-        const log = logger.inherit("isLinkCodeOnCooldown");
+    isLinkCodeOnCooldown(code: string): { onCooldown: boolean; remaining: number; } {
         const now = Date.now();
         const cooldownMs = this.config!._dev_dedupe_link_cooldown_ms || 10000;
         const lastTime = this.linkCodeTimestamps!.get(code) ?? 0;
+        let onCooldown = false;
+        let remaining = 0;
         if (now - lastTime < cooldownMs) {
-            const remainingCooldown = cooldownMs - (now - lastTime);
-            log.debug(`[isLinkCodeOnCooldown] ⏳ Code ${code} is on cooldown. Remaining: ${remainingCooldown}ms`);
-            return true;
+            onCooldown = true;
+            remaining = cooldownMs - (now - lastTime);
         }
-        return false;
+        return { onCooldown, remaining };
     },
 
     markLinkCodeAsProcessed(code: string) {
@@ -200,12 +195,15 @@ export default definePlugin({
         this.linkCodeTimestamps!.set(code, now);
     },
 
-    isLinkProcessable(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }) {
-        const log = logger.inherit("isLinkProcessable");
-        log.trace(`Processing link: ${link.code}`);
-        if (this.isLinkCodeOnCooldown(link.code)) return false;
+    isLinkProcessable(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }): { isProcessable: boolean; cooldown: number | null; } {
+        const { onCooldown, remaining } = this.isLinkCodeOnCooldown(link.code);
+
+        if (onCooldown) {
+            return { isProcessable: false, cooldown: remaining };
+        }
+
         this.markLinkCodeAsProcessed(link.code);
-        return true;
+        return { isProcessable: true, cooldown: null };
     },
 
     detectBiomeKeywords(text: string): string[] {
@@ -223,8 +221,8 @@ export default definePlugin({
     },
 
     // true if join was successful, false otherwise (currently means join is unsafe)
-    async join(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
-        const log = logger.inherit("join");
+    async joinLink(link: { link: string; code: string; type: "share" | "private"; placeId?: string; }, logger: any = createLogger("log")): Promise<{ isSafe: boolean; joinHappened: boolean; }> {
+        const log = logger.inherit("joinLink");
         const verifyMode = this.config!.verifyMode || "none";
         const fallbackActionDelayMs = this.config!._dev_verification_fail_fallback_delay_ms || 5000;
         let isSafe = false;
@@ -242,7 +240,7 @@ export default definePlugin({
         }
 
         log.debug(`Joining link: ${link.link}`);
-        await this.openRoblox(link);
+        await this.openRoblox(link, true);
         joinHappened = true;
 
         if (verifyMode === "after") {
@@ -260,10 +258,11 @@ export default definePlugin({
         return { isSafe, joinHappened };
     },
 
-    async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }) {
+    async openRoblox(link: { link?: string; type: "share" | "private" | "public"; code?: string; placeId?: string; }, closeBefore?: boolean): Promise<void> {
         const log = logger.inherit("openRoblox");
         const Native = (VencordNative.pluginHelpers.SolsAutoJoiner as unknown) as {
             openRoblox: (uri: string) => Promise<void>;
+            closeRoblox: () => Promise<void>;
         };
 
         if (!link?.type) {
@@ -305,7 +304,11 @@ export default definePlugin({
         }
 
         try {
+            const nativeStart = performance.now();
+            if (closeBefore) await Native.closeRoblox();
+            log.perf(`[native] closeRoblox took ${performance.now() - nativeStart}ms`);
             await Native.openRoblox(uri);
+            log.perf(`[native] openRoblox took ${performance.now() - nativeStart}ms`);
             log.debug("Roblox process spawned successfully.");
         } catch (err) {
             log.error("⚠️ Failed to open Roblox link:", err);
@@ -439,8 +442,9 @@ export default definePlugin({
     */
 
     async handleNewMessage(data: { channelId: string; message: any; }) {
-        const log = logger.inherit("handleNewMessage");
-        const msgStartTime = performance.now();
+        const log = logger.inherit(`${data?.message?.id}.handleNewMessage`);
+        const msgStart = performance.now();
+        const timeTaken = () => `${(performance.now() - msgStart).toFixed(2)}ms`;
 
         // Is it a valid message?
         const { channelId, message } = data;
@@ -455,30 +459,36 @@ export default definePlugin({
 
         // What is the server link?
         const link = this.getLinkFromMessageContent(content);
-        if (!link) return;
+        if (!link.ok) {
+            log.warn(`⚠️ Not valid because ${link.reason}. (at +${timeTaken()})`);
+            return;
+        }
 
-        // log.info("Checking if link is processable...");
-        if (!this.isLinkProcessable(link)) return; // Is it on cooldown? (deduplication via link)
-        log.debug(`Detected link of type ${link.type} from ${authorUsername} (${authorId}):`, link);
+        // Can we process it? (deduplication/cooldown)
+        const { isProcessable, cooldown } = this.isLinkProcessable(link);
+        if (!isProcessable) {
+            log.debug(`❌ ${link.code} on cooldown (${cooldown}ms) (at +${timeTaken()})`);
+            return;
+        }
 
         // What biome is it?
         const biomesMatched = this.detectBiomeKeywords(content);
         const biome = biomesMatched?.[0];
         if (biomesMatched.length === 0) {
-            log.debug(`❌ Link ${link.code} did not match any enabled biome.`);
+            log.info(`❌ ${link.code} (${link.type}) did not match any enabled biome. (at +${timeTaken()})`);
             return;
         }
         if (biomesMatched.length > 1) {
-            log.warn(`⚠️ Link ${link.code} matched multiple biomes: ${biomesMatched.join(", ")} — ignoring due to ambiguity.`);
+            log.warn(`⚠️ ${link.code} (${link.type}) matched multiple biomes: ${biomesMatched.join(", ")} — ignoring due to ambiguity. (at +${timeTaken()})`);
             return;
         }
-        log.info(`✅ Link ${link.code} matched biome: ${biome}`);
+        log.info(`✅ Code ${link.code} (${link.type}) matched biome: ${biome} (at +${timeTaken()})`);
 
         const shouldNotifyThisMessage = this.config!.notifyEnabled; // snapshot the value before autojoin, because it MIGHT disable from this.config directly
 
         // Should we join automatically?
         if (this.config!.joinEnabled) {
-            const { isSafe, joinHappened } = await this.join(link);
+            const { isSafe, joinHappened } = await this.joinLink(link, log);
             const wasVerified = this.config!.verifyMode !== "none";
 
             // se o join aconteceu, e o servidor era inseguro, entao o usuário foi movido
@@ -537,7 +547,7 @@ export default definePlugin({
             };
             this.sendNotification(title, body, onClick);
         }
-
+        log.trace(`Finished (at +${timeTaken()})`);
     },
 
     sendNotification(title: string, body: string, onclick?: () => void): void {

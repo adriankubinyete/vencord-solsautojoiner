@@ -31,8 +31,6 @@ function Note({ children }: { children: React.ReactNode; }) {
     );
 }
 
-
-
 function SectionMessage({ children }: { children: React.ReactNode; }) {
     return (
         <div style={{
@@ -485,6 +483,11 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
 
                 <SectionTitle>Other Settings</SectionTitle>
                 <Setting setting="uiShortcutAction" />
+                <Setting setting="joinCloseGameBefore" />
+                <Note>
+                    This makes your join about 1 second slower, but ✨hopefully✨ prevents the game from simply not launching at all. If you want faster joins, disable this and close your game manually before every join.
+                </Note>
+
 
                 <SectionTitle>Developer Settings</SectionTitle>
                 <Setting setting="_dev_logging_level" />

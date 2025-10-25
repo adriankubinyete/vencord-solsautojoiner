@@ -9,17 +9,18 @@ import { classNameFactory } from "@api/Styles";
 import { settings } from "./settings";
 export const cl = classNameFactory("vc-joiner-");
 
-export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+export type LogLevel = "trace" | "debug" | "perf" | "info" | "warn" | "error";
 
 const COLORS: Record<LogLevel, string> = {
     trace: "color: #6b7280",
     debug: "color: #9ca3af",
+    perf: "color: #ff00ff",
     info: "color: #3b82f6",
     warn: "color: #facc15",
     error: "color: #ef4444",
 };
 
-const LEVEL_ORDER: LogLevel[] = ["trace", "debug", "info", "warn", "error"];
+const LEVEL_ORDER: LogLevel[] = ["trace", "debug", "perf", "info", "warn", "error"];
 
 export function createLogger(name: string) {
     // Função interna que lê o nível dinamicamente
@@ -40,13 +41,12 @@ export function createLogger(name: string) {
         },
         trace: (...args: any[]) => log("trace", ...args),
         debug: (...args: any[]) => log("debug", ...args),
+        perf: (...args: any[]) => log("perf", ...args),
         info: (...args: any[]) => log("info", ...args),
         warn: (...args: any[]) => log("warn", ...args),
         error: (...args: any[]) => log("error", ...args),
     };
 }
-
-
 
 export interface SettingMeta {
     key: string;
