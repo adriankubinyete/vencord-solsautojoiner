@@ -75,7 +75,7 @@ export default definePlugin({
      * Tenta forçar a subscrição nos canais monitorados, sem abrir o histórico.
      */
 
-    async preloadMonitoredChannels(monitored: Set<string>) {
+    async preloadMonitoredChannels(monitored: Set<string>): Promise<void> {
         const log = baselogger.inherit("preloadMonitoredChannels");
         if (!monitored.size) return;
 
@@ -94,7 +94,7 @@ export default definePlugin({
         NavigationRouter.transitionToGuild("@me");
     },
 
-    start() {
+    start(): void {
         const log = baselogger.inherit("start");
         // Carrega a configuração do plugin
         const config = Settings.plugins.SolsAutoJoiner as unknown as JoinerSettings;
@@ -123,7 +123,7 @@ export default definePlugin({
         }
     },
 
-    stop() {
+    stop(): void {
         const log = baselogger.inherit("stop");
         if (this.boundHandler) FluxDispatcher.unsubscribe("MESSAGE_CREATE", this.boundHandler);
         this.boundHandler = null;
@@ -142,12 +142,12 @@ export default definePlugin({
     * Helpers
     */
 
-    channelIsBeingMonitored(channelId: string) {
+    channelIsBeingMonitored(channelId: string): boolean {
         const monitoredChannelsSet = new Set(this.config!.monitorChannelList.split(",").map(id => id.trim()).filter(Boolean));
         return monitoredChannelsSet?.has(channelId);
     },
 
-    userIsBlocked(userId: string) {
+    userIsBlocked(userId: string): boolean {
         return this.config!.monitorBlockedUserList.split(",").map(x => x.trim()).includes(userId);
     },
 
@@ -190,7 +190,7 @@ export default definePlugin({
         return { onCooldown, remaining };
     },
 
-    markLinkCodeAsProcessed(code: string) {
+    markLinkCodeAsProcessed(code: string): void {
         const now = Date.now();
         this.linkCodeTimestamps!.set(code, now);
     },
