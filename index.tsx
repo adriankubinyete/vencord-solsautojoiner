@@ -543,7 +543,7 @@ export default definePlugin({
                 `Sent by: ${authorUsername} (${authorId})`
             ].join("\n");
             const onClick = () => {
-                this.join(link);
+                this.joinLink(link, log);
             };
             this.sendNotification(title, body, onClick);
         }
