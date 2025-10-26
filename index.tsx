@@ -206,10 +206,10 @@ export default definePlugin({
         return { isProcessable: true, cooldown: null };
     },
 
-    detectTriggerKeywords(text: string): string[] {
+    detectTriggerKeywords(text: string, logger: any = baselogger): string[] {
         const normalized = text.toLowerCase();
         return Object.entries(TriggerKeywords)
-            .filter(([biome]) => this.config![biome as keyof TriggerKeywordSettings])
+            // .filter(([biome]) => this.config![biome as keyof TriggerKeywordSettings]) // only enabled biomes (WRONG! we dont care if its enabled or not, just if it has keywords)
             .filter(([_, keywords]) =>
                 keywords.some(kw => {
                     // eslint-disable-next-line @stylistic/quotes
@@ -513,17 +513,25 @@ export default definePlugin({
         }
 
         // What biome is it?
-        const biomesMatched = this.detectTriggerKeywords(content);
-        const biome = biomesMatched?.[0];
-        if (biomesMatched.length === 0) {
-            log.info(`❌ ${link.code} (${link.type}) did not match any enabled biome. (at +${timeTaken()})`);
+        const triggerWordsMatched = this.detectTriggerKeywords(content);
+        const match = triggerWordsMatched?.[0];
+        if (triggerWordsMatched.length === 0) {
+            log.info(`❌ ${link.code} (${link.type}) did not match any enabled. (at +${timeTaken()})`);
             return;
         }
-        if (biomesMatched.length > 1) {
-            log.warn(`⚠️ ${link.code} (${link.type}) matched multiple biomes: ${biomesMatched.join(", ")} — ignoring due to ambiguity. (at +${timeTaken()})`);
+        if (triggerWordsMatched.length > 1) {
+            log.warn(`⚠️ ${link.code} (${link.type}) matched multiple: ${triggerWordsMatched.join(", ")} — ignoring due to ambiguity. (at +${timeTaken()})`);
             return;
         }
-        log.debug(`✅ Code ${link.code} (${link.type}) matched biome: ${biome} (at +${timeTaken()})`);
+
+        // Is the biome enabled?
+        const isBiomeEnabled = Boolean(this.config?.[match as keyof TriggerKeywordSettings]);
+        if (!isBiomeEnabled) {
+            log.info(`🚫 ${link.code} (${link.type}) matched  "${match}" but it is disabled in config. (at +${timeTaken()})`);
+            return;
+        }
+
+        log.debug(`✅ Code ${link.code} (${link.type}) matched: ${match} (at +${timeTaken()})`);
 
         const shouldNotifyThisMessage = this.config!.notifyEnabled; // snapshot the value before autojoin, because it MIGHT disable from this.config directly
         const snapshotJoinEnabled = this.config!.joinEnabled;
@@ -580,7 +588,7 @@ export default definePlugin({
                 }
             }
 
-            const title = `🎯 SAJ :: Detected ${biome}`;
+            const title = `🎯 SAJ :: Detected ${match}`;
             const body = [
                 `Server: ${link.code} (${link.type})`,
                 `In channel: ${channelName} (${guildName})`,
