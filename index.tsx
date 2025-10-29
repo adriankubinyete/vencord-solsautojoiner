@@ -477,6 +477,38 @@ export default definePlugin({
         return blockedIds.includes(normalized);
     },
 
+    extractEmbedContentFromMessage(message: any): string {
+        const embeds = message?.embeds;
+        if (!embeds || !Array.isArray(embeds) || embeds.length === 0) return "";
+
+        const parts: string[] = [];
+
+        for (const embed of embeds) {
+            if (!embed || typeof embed !== "object") continue;
+
+            const title = embed.title ?? "";
+            const description = embed.description ?? "";
+            const footer = embed.footer?.text ?? "";
+
+            // Combina os fields (name + value)
+            const fieldsText = Array.isArray(embed.fields)
+                ? embed.fields
+                    .map(f => `${f?.name ?? ""} ${f?.value ?? ""}`.trim())
+                    .filter(Boolean)
+                    .join(" ")
+                : "";
+
+            parts.push(title, description, fieldsText, footer);
+        }
+
+        if (parts.length === 0) return "";
+
+        return parts
+            .filter(Boolean)
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim();
+    },
 
     /*
     * Message Handler
@@ -493,7 +525,14 @@ export default definePlugin({
         if (!this.channelIsBeingMonitored(channelId)) return;
         if (this.userIsBlocked(authorId)) return;
 
-        const content: string = (message.content ?? "");
+        let content: string = (message.content ?? "");
+        const embed_content: string = this.extractEmbedContentFromMessage(message);
+        if (embed_content) {
+            log.trace("Merging the following embed data to content: ", embed_content);
+            content += ` ${embed_content}`;
+        }
+
+        // log.info("Message:", content, embed_contents);
         const authorUsername = message.author?.username ?? "Unknown User";
         const channelName = ChannelStore.getChannel(channelId)?.name ?? "Unknown Channel";
         const guildName = GuildStore.getGuild(ChannelStore.getChannel(channelId)?.guild_id)?.name ?? "Unknown Guild";
