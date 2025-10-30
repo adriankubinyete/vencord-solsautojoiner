@@ -502,6 +502,9 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
 
                 <SectionTitle>Pre-Join Behavior</SectionTitle>
                 <Setting setting="joinCloseGameBefore" />
+                <Note>
+                    This makes your join about 1 second slower, but ✨hopefully✨ prevents the game from simply not launching at all. If you want faster joins, disable this and close your game manually before every join.
+                </Note>
 
                 <SectionTitle>Post-Join Behavior</SectionTitle>
                 <Setting setting="joinDisableAfterAutoJoin" />
@@ -525,9 +528,6 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
 
                 <SectionTitle>Other Settings</SectionTitle>
                 <Setting setting="uiShortcutAction" />
-                <Note>
-                    This makes your join about 1 second slower, but ✨hopefully✨ prevents the game from simply not launching at all. If you want faster joins, disable this and close your game manually before every join.
-                </Note>
 
 
                 <SectionTitle>Developer Settings</SectionTitle>
