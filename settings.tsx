@@ -251,3 +251,40 @@ export const TriggerKeywords: Record<keyof TriggerKeywordSettings, string[]> = {
     MARI: ["mari", "voidcoin", "void coin"],
     JESTER: ["jester", "oblivion"],
 };
+
+// Store não-persistente para joins recentes
+export const recentJoinsStore = {
+    recentJoins: [] as Array<{
+        id: number;
+        title: string;
+        author: string;
+        image?: string;
+        description: string;
+        timestamp: number;
+        code: string;
+        type: string;
+    }>,
+    add(joinData: {
+        title: string;
+        author: string;
+        image?: string;
+        description: string;
+        code: string;
+        type: string;
+    }) {
+        const now = Date.now();
+        const newJoin = {
+            id: now,
+            timestamp: now,
+            ...joinData
+        };
+
+        this.recentJoins.unshift(newJoin);
+        if (this.recentJoins.length > 10) {
+            this.recentJoins.pop();
+        }
+    },
+    clear() {
+        this.recentJoins.length = 0;
+    }
+};

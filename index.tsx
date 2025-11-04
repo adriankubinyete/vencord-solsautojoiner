@@ -11,7 +11,7 @@ import definePlugin from "@utils/types";
 import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu, NavigationRouter } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
-import { JoinerSettings, settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
+import { JoinerSettings, recentJoinsStore,settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
 import { createLogger } from "./utils";
 
 const baselogger = createLogger("SolsAutoJoiner");
@@ -70,6 +70,16 @@ export default definePlugin({
     monitoredSet: null as Set<string> | null,
     linkCodeTimestamps: null as Map<string, number> | null,
     config: null as JoinerSettings | null,
+    addRecentJoin(joinData: {
+        title: string;
+        author: string;
+        image?: string;
+        description: string;
+        code: string;
+        type: string;
+    }) {
+        recentJoinsStore.add(joinData);
+    },
 
     /**
      * Tenta forçar a subscrição nos canais monitorados, sem abrir o histórico.
@@ -110,6 +120,7 @@ export default definePlugin({
 
         // Inicializa o Map para deduplicação de links
         this.linkCodeTimestamps = new Map();
+        recentJoinsStore.clear();
 
         // Bind do handler de novas mensagens
         this.boundHandler = this.handleNewMessage.bind(this);
@@ -131,9 +142,11 @@ export default definePlugin({
 
         this.linkCodeTimestamps?.clear();
         this.linkCodeTimestamps = null;
+        recentJoinsStore.clear();
 
         this.monitoredSet?.clear();
         this.monitoredSet = null;
+
 
         log.info("Stopped.");
     },
@@ -588,6 +601,17 @@ export default definePlugin({
 
             if (wasVerified && !isSafe && this.config!.monitorBlockUnsafeServerMessageAuthors) {
                 this.config!.monitorBlockedUserList += `,${authorId}`;
+            }
+
+            if (joinHappened) {
+                this.addRecentJoin({
+                    title: match, // biome como título
+                    author: authorUsername,
+                    image: "https://discord.com/assets/dcce7481d64c9441.svg", // placeholder; pode ser dinâmico por biome se quiser
+                    description: `Joined in ${channelName} (${guildName})`, // base; o "X ago" é computado no render
+                    code: link.code,
+                    type: link.type,
+                });
             }
 
             if (wasVerified && joinHappened && !isSafe) {

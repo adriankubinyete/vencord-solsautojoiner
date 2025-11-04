@@ -11,7 +11,7 @@ import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } fr
 import { OptionType } from "@utils/types";
 import { Button, ChannelRouter, ChannelStore, Forms, React, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
 
-import { settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
+import { recentJoinsStore, settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
 import { cl, getSettingMeta } from "./utils";
 
 function Note({
@@ -505,11 +505,21 @@ function DebugButton() {
 //     );
 // }
 
+function formatTimeAgo(timestamp: number): string {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "Just now";
+    if (minutes === 1) return "1 minute ago";
+    return `${minutes} minutes ago`;
+}
+
 type JoinedServerCardProps = {
     author: string;
     image?: string;
     title: string;
-    description?: string;
+    description: string;
+    timeAgo: string;
     onClick?: () => void;
 };
 
@@ -518,6 +528,7 @@ export function JoinedServerCard({
     image,
     title,
     description,
+    timeAgo,
     onClick,
 }: JoinedServerCardProps) {
     return (
@@ -576,7 +587,7 @@ export function JoinedServerCard({
                         marginTop: 3,
                     }}
                 >
-                    Joined by {author}
+                    Joined by {author} • {timeAgo}
                 </div>
             </div>
         </div>
@@ -587,92 +598,7 @@ export function RecentServersListButton() {
     const [menuOpen, setMenuOpen] = React.useState(false);
     const toggleMenu = () => setMenuOpen(prev => !prev);
 
-    const cards = [
-        {
-            id: 1,
-            title: "Cozy Garden",
-            author: "Adrian",
-            image: "https://placekitten.com/80/80",
-            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
-        },
-        {
-            id: 2,
-            title: "Mutant Grove",
-            author: "Luna",
-            image: "https://placekitten.com/81/81",
-            description: "Joined 15 minutes ago",
-        },
-        {
-            id: 3,
-            title: "Evergreen Base",
-            author: "Theo",
-            image: "https://placekitten.com/82/82",
-            description: "Joined 32 minutes ago",
-        },
-        {
-            id: 1,
-            title: "Cozy Garden",
-            author: "Adrian",
-            image: "https://placekitten.com/80/80",
-            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
-        },
-        {
-            id: 2,
-            title: "Mutant Grove",
-            author: "Luna",
-            image: "https://placekitten.com/81/81",
-            description: "Joined 15 minutes ago",
-        },
-        {
-            id: 3,
-            title: "Evergreen Base",
-            author: "Theo",
-            image: "https://placekitten.com/82/82",
-            description: "Joined 32 minutes ago",
-        },
-        {
-            id: 1,
-            title: "Cozy Garden",
-            author: "Adrian",
-            image: "https://placekitten.com/80/80",
-            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
-        },
-        {
-            id: 2,
-            title: "Mutant Grove",
-            author: "Luna",
-            image: "https://placekitten.com/81/81",
-            description: "Joined 15 minutes ago",
-        },
-        {
-            id: 3,
-            title: "Evergreen Base",
-            author: "Theo",
-            image: "https://placekitten.com/82/82",
-            description: "Joined 32 minutes ago",
-        },
-        {
-            id: 1,
-            title: "Cozy Garden",
-            author: "Adrian",
-            image: "https://placekitten.com/80/80",
-            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
-        },
-        {
-            id: 2,
-            title: "Mutant Grove",
-            author: "Luna",
-            image: "https://placekitten.com/81/81",
-            description: "Joined 15 minutes ago",
-        },
-        {
-            id: 3,
-            title: "Evergreen Base",
-            author: "Theo",
-            image: "https://placekitten.com/82/82",
-            description: "Joined 32 minutes ago",
-        },
-    ];
+    const { recentJoins } = recentJoinsStore;
 
     return (
         <div
@@ -717,35 +643,43 @@ export function RecentServersListButton() {
                 }}
             >
                 <Forms.FormTitle tag="h4" style={{ marginBottom: 6 }}>
-                    Recently Notified Servers
+                    Recently Joined Servers ({recentJoins.length})
                 </Forms.FormTitle>
 
-                {cards.map((srv, index) => (
-                    <div
-                        key={srv.id}
-                        style={{
-                            transform: menuOpen
-                                ? "translateY(0)"
-                                : "translateY(10px)",
-                            opacity: menuOpen ? 1 : 0,
-                            transitionDelay: menuOpen
-                                ? `${index * 0.05}s`
-                                : "0s",
-                            transition:
-                                "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.3s ease",
-                        }}
-                    >
-                        <JoinedServerCard
-                            title={srv.title}
-                            author={srv.author}
-                            image={srv.image}
-                            description={srv.description}
-                            onClick={() =>
-                                console.log(`Clicked ${srv.title}`)
-                            }
-                        />
+                {recentJoins.length === 0 ? (
+                    <div style={{ color: "#aaa", fontSize: 12, textAlign: "center", padding: "20px 0" }}>
+                        No recent joins yet.
                     </div>
-                ))}
+                ) : (
+                    recentJoins.map((srv, index) => (
+                        <div
+                            key={srv.id}
+                            style={{
+                                transform: menuOpen
+                                    ? "translateY(0)"
+                                    : "translateY(10px)",
+                                opacity: menuOpen ? 1 : 0,
+                                transitionDelay: menuOpen
+                                    ? `${index * 0.05}s`
+                                    : "0s",
+                                transition:
+                                    "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.3s ease",
+                            }}
+                        >
+                            <JoinedServerCard
+                                title={srv.title}
+                                author={srv.author}
+                                image={srv.image}
+                                description={srv.description}
+                                timeAgo={formatTimeAgo(srv.timestamp)}
+                                onClick={() => {
+                                    console.log(`Re-join ${srv.title} (code: ${srv.code}, type: ${srv.type})`);
+                                    // TODO: Implement re-join logic, e.g., copy code to clipboard or trigger join
+                                }}
+                            />
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );
