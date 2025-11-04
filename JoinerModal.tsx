@@ -504,9 +504,112 @@ function DebugButton() {
 //         </div>
 //     );
 // }
+
+type JoinedServerCardProps = {
+    author: string;
+    image?: string;
+    title: string;
+    description?: string;
+    onClick?: () => void;
+};
+
+export function JoinedServerCard({
+    author,
+    image,
+    title,
+    description,
+    onClick,
+}: JoinedServerCardProps) {
+    return (
+        <div
+            onClick={onClick}
+            style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 10px",
+                background: "rgba(255,255,255,0.08)",
+                borderRadius: 6,
+                marginBottom: 6,
+                cursor: onClick ? "pointer" : "default",
+                transition: "background 0.25s ease, transform 0.2s ease",
+            }}
+            onMouseEnter={e => {
+                (e.currentTarget as HTMLDivElement).style.background =
+                    "rgba(255,255,255,0.12)";
+                (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={e => {
+                (e.currentTarget as HTMLDivElement).style.background =
+                    "rgba(255,255,255,0.08)";
+                (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
+            }}
+        >
+            {/* Imagem do servidor */}
+            {image && (
+                <img
+                    src={image}
+                    alt={title}
+                    style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 6,
+                        objectFit: "cover",
+                    }}
+                />
+            )}
+
+            {/* Conteúdo textual */}
+            <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>
+                    {title}
+                </div>
+                {description && (
+                    <div style={{ fontSize: 12, color: "#ccc", marginTop: 2 }}>
+                        {description}
+                    </div>
+                )}
+                <div
+                    style={{
+                        fontSize: 11,
+                        color: "#999",
+                        marginTop: 3,
+                    }}
+                >
+                    Joined by {author}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function RecentServersListButton() {
     const [menuOpen, setMenuOpen] = React.useState(false);
     const toggleMenu = () => setMenuOpen(prev => !prev);
+
+    const cards = [
+        {
+            id: 1,
+            title: "Cozy Garden",
+            author: "Adrian",
+            image: "https://placekitten.com/80/80",
+            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
+        },
+        {
+            id: 2,
+            title: "Mutant Grove",
+            author: "Luna",
+            image: "https://placekitten.com/81/81",
+            description: "Joined 15 minutes ago",
+        },
+        {
+            id: 3,
+            title: "Evergreen Base",
+            author: "Theo",
+            image: "https://placekitten.com/82/82",
+            description: "Joined 32 minutes ago",
+        },
+    ];
 
     return (
         <div
@@ -553,26 +656,30 @@ export function RecentServersListButton() {
                     Recently Notified Servers
                 </Forms.FormTitle>
 
-                {[1, 2, 3].map(i => (
+                {cards.map((srv, index) => (
                     <div
-                        key={i}
+                        key={srv.id}
                         style={{
-                            padding: "6px 8px",
-                            background: "rgba(255,255,255,0.08)",
-                            borderRadius: 6,
-                            marginBottom: 6,
                             transform: menuOpen
                                 ? "translateY(0)"
-                                : "translateY(10px)", // agora vem de baixo
+                                : "translateY(10px)",
                             opacity: menuOpen ? 1 : 0,
+                            transitionDelay: menuOpen
+                                ? `${index * 0.05}s`
+                                : "0s",
                             transition:
                                 "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.3s ease",
                         }}
                     >
-                        <b>Server #{i}</b>
-                        <div style={{ fontSize: 12, color: "#ccc" }}>
-                            Example info about this server.
-                        </div>
+                        <JoinedServerCard
+                            title={srv.title}
+                            author={srv.author}
+                            image={srv.image}
+                            description={srv.description}
+                            onClick={() =>
+                                console.log(`Clicked ${srv.title}`)
+                            }
+                        />
                     </div>
                 ))}
             </div>
