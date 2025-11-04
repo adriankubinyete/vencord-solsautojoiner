@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Button } from "@components/Button";
 import { CheckedTextInput } from "@components/CheckedTextInput";
 import { FormSwitch } from "@components/FormSwitch";
 import { Margins } from "@components/margins";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
 import { OptionType } from "@utils/types";
-import { ChannelRouter, ChannelStore, Forms, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
+import { Button,ChannelRouter, ChannelStore, Forms, React, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
 
 import { settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
 import { cl, getSettingMeta } from "./utils";
@@ -454,8 +453,59 @@ function DebugButton() {
 }
 
 
-// -------------------------------
+export function RecentServersListButton() {
+    const [menuOpen, setMenuOpen] = React.useState(false);
 
+    const toggleMenu = () => setMenuOpen(prev => !prev);
+
+    return (
+        <div style={{ position: "relative", width: "100%" }}>
+            <Button
+                size={Button.Sizes.SMALL}
+                onClick={toggleMenu}
+            >
+                {menuOpen ? "Hide Recent Servers" : "Show Recent Servers"}
+            </Button>
+
+            <div
+                style={{
+                    overflow: "hidden",
+                    transition: "max-height 0.3s ease, opacity 0.3s ease",
+                    maxHeight: menuOpen ? 300 : 0,
+                    opacity: menuOpen ? 1 : 0,
+                    marginTop: 8,
+                    background: "rgba(255,255,255,0.05)",
+                    borderRadius: 8,
+                    padding: menuOpen ? 10 : 0,
+                }}
+            >
+                <Forms.FormTitle tag="h4" style={{ marginBottom: 6 }}>
+                    Recently Notified Servers
+                </Forms.FormTitle>
+
+                {[1, 2, 3].map(i => (
+                    <div
+                        key={i}
+                        style={{
+                            padding: "6px 8px",
+                            background: "rgba(255,255,255,0.08)",
+                            borderRadius: 6,
+                            marginBottom: 6,
+                        }}
+                    >
+                        <b>Server #{i}</b>
+                        <div style={{ fontSize: 12, color: "#ccc" }}>
+                            Example info about this server.
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+
+// -------------------------------
 export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
     // make uiShowKeywords dynamic
     const reactive = settings.use(["uiShowKeywords"]);
@@ -538,6 +588,7 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <DebugButton />
                 <GetRobloxButton />
                 <CloseRobloxButton />
+                <RecentServersListButton />
 
             </ModalContent>
 
