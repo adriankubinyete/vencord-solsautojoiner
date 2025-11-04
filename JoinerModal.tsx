@@ -453,30 +453,100 @@ function DebugButton() {
 }
 
 
+// export function RecentServersListButton() {
+//     const [menuOpen, setMenuOpen] = React.useState(false);
+
+//     const toggleMenu = () => setMenuOpen(prev => !prev);
+
+//     return (
+//         <div style={{ position: "relative", width: "100%" }}>
+//             <Button
+//                 width={"100%"}
+//                 size={Button.Sizes.SMALL}
+//                 onClick={toggleMenu}
+//             >
+//                 {menuOpen ? "Hide Recent Servers" : "Show Recent Servers"}
+//             </Button>
+
+//             <div
+//                 style={{
+//                     overflow: "hidden",
+//                     transition: "max-height 0.3s ease, opacity 0.3s ease",
+//                     maxHeight: menuOpen ? 300 : 0,
+//                     opacity: menuOpen ? 1 : 0,
+//                     marginTop: 8,
+//                     background: "rgba(255,255,255,0.05)",
+//                     borderRadius: 8,
+//                     padding: menuOpen ? 10 : 0,
+//                 }}
+//             >
+//                 <Forms.FormTitle tag="h4" style={{ marginBottom: 6 }}>
+//                     Recently Notified Servers
+//                 </Forms.FormTitle>
+
+//                 {[1, 2, 3].map(i => (
+//                     <div
+//                         key={i}
+//                         style={{
+//                             padding: "6px 8px",
+//                             background: "rgba(255,255,255,0.08)",
+//                             borderRadius: 6,
+//                             marginBottom: 6,
+//                         }}
+//                     >
+//                         <b>Server #{i}</b>
+//                         <div style={{ fontSize: 12, color: "#ccc" }}>
+//                             Example info about this server.
+//                         </div>
+//                     </div>
+//                 ))}
+//             </div>
+//         </div>
+//     );
+// }
 export function RecentServersListButton() {
     const [menuOpen, setMenuOpen] = React.useState(false);
-
     const toggleMenu = () => setMenuOpen(prev => !prev);
 
     return (
-        <div style={{ position: "relative", width: "100%" }}>
+        <div
+            style={{
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "stretch",
+                width: "100%",
+                transition: "all 0.3s ease",
+            }}
+        >
+            {/* Botão principal */}
             <Button
+                width={"100%"}
                 size={Button.Sizes.SMALL}
                 onClick={toggleMenu}
             >
-                {menuOpen ? "Hide Recent Servers" : "Show Recent Servers"}
+                {menuOpen ? "Hide recent joins ▲" : "Show recent joins ▼"}
             </Button>
 
+            {/* Menu expansível abaixo do botão */}
             <div
                 style={{
-                    overflow: "hidden",
-                    transition: "max-height 0.3s ease, opacity 0.3s ease",
-                    maxHeight: menuOpen ? 300 : 0,
-                    opacity: menuOpen ? 1 : 0,
-                    marginTop: 8,
+                    marginTop: menuOpen ? 10 : 0,
                     background: "rgba(255,255,255,0.05)",
                     borderRadius: 8,
                     padding: menuOpen ? 10 : 0,
+                    overflow: "hidden",
+                    opacity: menuOpen ? 1 : 0,
+                    maxHeight: menuOpen ? 500 : 0,
+                    transform: menuOpen
+                        ? "translateY(0)"
+                        : "translateY(-6px)", // leve movimento ao abrir
+                    transition:
+                        "max-height 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), " +
+                        "opacity 0.3s ease, " +
+                        "padding 0.3s ease, " +
+                        "margin-top 0.3s ease, " +
+                        "transform 0.35s ease-out",
                 }}
             >
                 <Forms.FormTitle tag="h4" style={{ marginBottom: 6 }}>
@@ -491,6 +561,12 @@ export function RecentServersListButton() {
                             background: "rgba(255,255,255,0.08)",
                             borderRadius: 6,
                             marginBottom: 6,
+                            transform: menuOpen
+                                ? "translateY(0)"
+                                : "translateY(10px)", // agora vem de baixo
+                            opacity: menuOpen ? 1 : 0,
+                            transition:
+                                "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.3s ease",
                         }}
                     >
                         <b>Server #{i}</b>
@@ -503,6 +579,7 @@ export function RecentServersListButton() {
         </div>
     );
 }
+
 
 
 // -------------------------------
@@ -519,6 +596,7 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
             </ModalHeader>
 
             <ModalContent className={cl("modal-content")}>
+                <RecentServersListButton />
                 <SectionTitle>On link detection</SectionTitle>
                 <Setting setting="joinEnabled" />
                 <Setting setting="notifyEnabled" />
@@ -588,7 +666,6 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
                 <DebugButton />
                 <GetRobloxButton />
                 <CloseRobloxButton />
-                <RecentServersListButton />
 
             </ModalContent>
 
