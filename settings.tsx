@@ -235,7 +235,7 @@ export type JoinerSettings = PluginSettings & TriggerKeywordSettings;
 
 // Palavras-chave por biome
 export const TriggerKeywords: Record<keyof TriggerKeywordSettings, string[]> = {
-    GLITCHED: ["glitch", "glitched"],
+    GLITCHED: ["glitch", "glitched", "glich", "glith"], // broken keywords because people freak out and type wrong
     DREAMSPACE: ["dream", "dream space", "dreamspace"],
     BLOODRAIN: ["blood rain", "blood", "bloodrain"],
     PUMPKINMOON: ["pump", "pumpkin", "pmoon"],

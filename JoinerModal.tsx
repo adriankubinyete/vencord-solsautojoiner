@@ -9,7 +9,7 @@ import { FormSwitch } from "@components/FormSwitch";
 import { Margins } from "@components/margins";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
 import { OptionType } from "@utils/types";
-import { Button,ChannelRouter, ChannelStore, Forms, React, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
+import { Button, ChannelRouter, ChannelStore, Forms, React, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
 
 import { settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
 import { cl, getSettingMeta } from "./utils";
@@ -609,6 +609,69 @@ export function RecentServersListButton() {
             image: "https://placekitten.com/82/82",
             description: "Joined 32 minutes ago",
         },
+        {
+            id: 1,
+            title: "Cozy Garden",
+            author: "Adrian",
+            image: "https://placekitten.com/80/80",
+            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
+        },
+        {
+            id: 2,
+            title: "Mutant Grove",
+            author: "Luna",
+            image: "https://placekitten.com/81/81",
+            description: "Joined 15 minutes ago",
+        },
+        {
+            id: 3,
+            title: "Evergreen Base",
+            author: "Theo",
+            image: "https://placekitten.com/82/82",
+            description: "Joined 32 minutes ago",
+        },
+        {
+            id: 1,
+            title: "Cozy Garden",
+            author: "Adrian",
+            image: "https://placekitten.com/80/80",
+            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
+        },
+        {
+            id: 2,
+            title: "Mutant Grove",
+            author: "Luna",
+            image: "https://placekitten.com/81/81",
+            description: "Joined 15 minutes ago",
+        },
+        {
+            id: 3,
+            title: "Evergreen Base",
+            author: "Theo",
+            image: "https://placekitten.com/82/82",
+            description: "Joined 32 minutes ago",
+        },
+        {
+            id: 1,
+            title: "Cozy Garden",
+            author: "Adrian",
+            image: "https://placekitten.com/80/80",
+            description: "Joined 5 minutes ago bla bal bla blab la bla bla bla lb alb alb alb la bla bla bl alb la lbal\n\n\n\nblablablabla",
+        },
+        {
+            id: 2,
+            title: "Mutant Grove",
+            author: "Luna",
+            image: "https://placekitten.com/81/81",
+            description: "Joined 15 minutes ago",
+        },
+        {
+            id: 3,
+            title: "Evergreen Base",
+            author: "Theo",
+            image: "https://placekitten.com/82/82",
+            description: "Joined 32 minutes ago",
+        },
     ];
 
     return (
@@ -638,18 +701,19 @@ export function RecentServersListButton() {
                     background: "rgba(255,255,255,0.05)",
                     borderRadius: 8,
                     padding: menuOpen ? 10 : 0,
-                    overflow: "hidden",
+                    overflowY: menuOpen ? "auto" : "hidden",
+                    overflowX: "hidden",
                     opacity: menuOpen ? 1 : 0,
-                    maxHeight: menuOpen ? 500 : 0,
-                    transform: menuOpen
-                        ? "translateY(0)"
-                        : "translateY(-6px)", // leve movimento ao abrir
+                    maxHeight: menuOpen ? 300 : 0, // altura limite p/ ~5 cards
+                    transform: menuOpen ? "translateY(0)" : "translateY(-6px)",
                     transition:
                         "max-height 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), " +
                         "opacity 0.3s ease, " +
                         "padding 0.3s ease, " +
                         "margin-top 0.3s ease, " +
                         "transform 0.35s ease-out",
+                    scrollbarWidth: "thin",
+                    scrollbarColor: "rgba(255,255,255,0.2) transparent",
                 }}
             >
                 <Forms.FormTitle tag="h4" style={{ marginBottom: 6 }}>
