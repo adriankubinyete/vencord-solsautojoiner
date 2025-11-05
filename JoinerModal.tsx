@@ -453,12 +453,31 @@ function DebugButton() {
 }
 
 function formatTimeAgo(timestamp: number): string {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "Just now";
-    if (minutes === 1) return "1 minute ago";
-    return `${minutes} minutes ago`;
+    const diff = Date.now() - timestamp;
+    const minute = 60_000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    const month = 30 * day;
+    const year = 365 * day;
+
+    if (diff < minute) return "Just now";
+
+    const units = [
+        { label: "year", ms: year },
+        { label: "month", ms: month },
+        { label: "day", ms: day },
+        { label: "hour", ms: hour },
+        { label: "minute", ms: minute },
+    ];
+
+    for (const { label, ms } of units) {
+        if (diff >= ms) {
+            const value = Math.floor(diff / ms);
+            return `${value} ${label}${value !== 1 ? "s" : ""} ago`;
+        }
+    }
+
+    return "Just now";
 }
 
 type JoinedServerCardProps = {
@@ -482,94 +501,129 @@ export function JoinedServerCard({
     safety,
     onClick,
 }: JoinedServerCardProps) {
-    const avatarUrl = authorAvatar || "https://discord.com/assets/881ed827548f38c6.svg"; // fallback interrogação
+    const avatarUrl =
+        authorAvatar || "https://discord.com/assets/881ed827548f38c6.svg"; // fallback interrogação
+    const fallbackImage =
+        "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/assets/unknown_biome.png";
+
+    // Estilos base
+    const isUnsafe = safety === false;
+    const baseBackground = isUnsafe ? "rgba(237, 66, 69, 0.1)" : "rgba(255,255,255,0.08)";
+    const baseBorder = isUnsafe ? "1px solid rgba(237, 66, 69, 0.4)" : "none";
+    const hoverBackground = isUnsafe ? "rgba(237, 66, 69, 0.15)" : "rgba(255,255,255,0.12)";
+    const hoverBorder = isUnsafe ? "1px solid rgba(237, 66, 69, 0.6)" : baseBorder;
 
     return (
         <div
             onClick={onClick}
             style={{
                 display: "flex",
-                alignItems: "center",
-                gap: 14,
-                padding: "8px 10px",
-                background: "rgba(255,255,255,0.08)",
-                borderRadius: 6,
-                marginBottom: 6,
+                flexDirection: "column",
+                background: baseBackground,
+                border: baseBorder,
+                borderRadius: 8,
+                marginBottom: 10,
                 cursor: onClick ? "pointer" : "default",
-                transition: "background 0.25s ease, transform 0.2s ease",
+                transition: "background 0.25s ease, transform 0.2s ease, border-color 0.25s ease",
+                overflow: "hidden",
             }}
             onMouseEnter={e => {
-                (e.currentTarget as HTMLDivElement).style.background =
-                    "rgba(255,255,255,0.12)";
+                (e.currentTarget as HTMLDivElement).style.background = hoverBackground;
+                (e.currentTarget as HTMLDivElement).style.borderColor = isUnsafe ? "rgba(237, 66, 69, 0.6)" : "inherit";
                 (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
             }}
             onMouseLeave={e => {
-                (e.currentTarget as HTMLDivElement).style.background =
-                    "rgba(255,255,255,0.08)";
+                (e.currentTarget as HTMLDivElement).style.background = baseBackground;
+                (e.currentTarget as HTMLDivElement).style.borderColor = isUnsafe ? "rgba(237, 66, 69, 0.4)" : "inherit";
                 (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
             }}
         >
-            {/* Imagem do servidor (opcional, ao lado) */}
-            {image && (
+            {/* Seção de conteúdo: textos à esquerda, imagem à direita */}
+            <div style={{ padding: "12px", display: "flex", flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
+                {/* Textos à esquerda */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div
+                        style={{
+                            fontWeight: 600,
+                            color: "#fff",
+                            fontSize: 15,
+                        }}
+                    >
+                        {title}
+                    </div>
+
+                    {description && (
+                        <div style={{ fontSize: 13, color: "#ccc" }}>{description}</div>
+                    )}
+                </div>
+
+                {/* Imagem thumbnail à direita */}
                 <img
-                    src={image}
+                    src={image || fallbackImage}
                     alt={title}
+                    onError={e => {
+                        (e.currentTarget as HTMLImageElement).src = fallbackImage;
+                    }}
                     style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 6,
+                        width: 80,
+                        height: 80,
                         objectFit: "cover",
+                        borderRadius: 6,
+                        flexShrink: 0, // Evita que a imagem encolha
                     }}
                 />
-            )}
+            </div>
 
-            {/* Conteúdo textual */}
-            <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>
-                    {title}
-                </div>
-                {description && (
-                    <div style={{ fontSize: 12, color: "#ccc", marginTop: 2 }}>
-                        {description}
-                    </div>
-                )}
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: 11,
-                        color: "#999",
-                        marginTop: 3,
-                    }}
-                >
-                    {/* Bolinha do avatar do author, inline à esquerda do texto */}
+            {/* Linha inferior (abaixo da imagem e do conteúdo) */}
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px 10px",
+                    borderTop: "1px solid rgba(255,255,255,0.1)",
+                    fontSize: 12,
+                    color: "#999",
+                }}
+            >
+                {/* Author info à esquerda */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <img
                         src={avatarUrl}
                         alt={`${author}'s avatar`}
+                        onError={e => {
+                            (e.currentTarget as HTMLImageElement).src = fallbackImage;
+                        }}
                         style={{
                             width: 18,
                             height: 18,
-                            borderRadius: "50%", // bolinha redonda
+                            borderRadius: "50%",
                             objectFit: "cover",
                             border: "1px solid rgba(255,255,255,0.1)",
                         }}
                     />
                     <span>
                         Sent by {author} • {timeAgo}
-                        {safety !== undefined && (
-                            <span style={{ marginLeft: 8, color: safety ? "#3ba55c" : "#ed4245", fontWeight: "bold" }}>
-                                {safety ? "✅ Safe" : "❌ Fake"}
-                            </span>
-                        )}
                     </span>
                 </div>
+
+                {/* Safe/Fake à direita */}
+                {safety !== undefined && (
+                    <span
+                        style={{
+                            color: safety ? "#3ba55c" : "#ed4245",
+                            fontWeight: "bold",
+                        }}
+                    >
+                        {safety ? "✅ Safe" : "❌ Fake"}
+                    </span>
+                )}
             </div>
         </div>
     );
 }
 
-export function RecentServersListButton({ onClose }: { onClose?: () => void }) {
+export function RecentServersListButton({ onClose }: { onClose?: () => void; }) {
     const [menuOpen, setMenuOpen] = React.useState(false);
     const toggleMenu = () => setMenuOpen(prev => !prev);
 
@@ -645,7 +699,7 @@ export function RecentServersListButton({ onClose }: { onClose?: () => void }) {
                                 title={srv.title}
                                 author={srv.author.name}
                                 authorAvatar={srv.author.avatar}
-                                image={srv.image}
+                                image={srv.image} // servir https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/assets/unknown_biome.png se tiver quebrado
                                 description={srv.description}
                                 timeAgo={formatTimeAgo(srv.timestamp)}
                                 safety={srv.link.isSafe}

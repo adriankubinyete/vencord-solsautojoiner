@@ -315,13 +315,13 @@ export const TriggerKeywords = {
         type: "merchant",
         name: "Mari",
         keywords: ["mari", "voidcoin", "void coin"],
-        iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/mari.png"
+        iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/assets/massri.png"
     },
     JESTER: {
         type: "merchant",
         name: "Jester",
         keywords: ["jester", "oblivion"],
-        iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/jester.png"
+        iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/assets/jester.png"
     },
  } as const;
 
