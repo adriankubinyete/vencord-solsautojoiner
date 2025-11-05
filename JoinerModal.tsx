@@ -584,10 +584,19 @@ export function JoinedServerCard({
                     borderTop: "1px solid rgba(255,255,255,0.1)",
                     fontSize: 12,
                     color: "#999",
+                    gap: 8,
                 }}
             >
-                {/* Author info à esquerda */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {/* Author info à esquerda (autor truncado, tempo sempre visível) */}
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        overflow: "hidden",
+                        maxWidth: "70%", // controla quanto espaço essa parte usa
+                    }}
+                >
                     <img
                         src={avatarUrl}
                         alt={`${author}'s avatar`}
@@ -600,24 +609,53 @@ export function JoinedServerCard({
                             borderRadius: "50%",
                             objectFit: "cover",
                             border: "1px solid rgba(255,255,255,0.1)",
+                            flexShrink: 0,
                         }}
                     />
-                    <span>
-                        Sent by {author} • {timeAgo}
-                    </span>
+
+                    {/* Texto principal */}
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            minWidth: 0, // importante para truncamento flex funcionar
+                        }}
+                    >
+                        <span
+                            style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                display: "block",
+                                maxWidth: 130, // <-- controla truncamento do autor
+                            }}
+                        >
+                            {author}
+                        </span>
+                        <span style={{ flexShrink: 0 }}>• {timeAgo}</span>
+                    </div>
                 </div>
 
                 {/* Safe/Fake à direita */}
-                {safety !== undefined && (
-                    <span
-                        style={{
-                            color: safety ? "#3ba55c" : "#ed4245",
-                            fontWeight: "bold",
-                        }}
-                    >
-                        {safety ? "✅ Safe" : "❌ Fake"}
-                    </span>
-                )}
+                <span
+                    style={{
+                        color:
+                            safety === undefined
+                                ? "#faa61a" // amarelo para "Not verified"
+                                : safety
+                                    ? "#3ba55c" // verde para Safe
+                                    : "#ed4245", // vermelho para Fake
+                        fontWeight: "bold",
+                        flexShrink: 0,
+                    }}
+                >
+                    {safety === undefined
+                        ? "⚠️ Not verified"
+                        : safety
+                            ? "✅ Safe"
+                            : "❌ Fake"}
+                </span>
             </div>
         </div>
     );
@@ -702,7 +740,7 @@ export function RecentServersListButton({ onClose }: { onClose?: () => void; }) 
                                 image={srv.image} // servir https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/assets/unknown_biome.png se tiver quebrado
                                 description={srv.description}
                                 timeAgo={formatTimeAgo(srv.timestamp)}
-                                safety={srv.link.isSafe}
+                                safety={srv.link.wasVerified ? srv.link.isSafe : undefined}
                                 onClick={() => {
                                     setMenuOpen(false); // fecha o menu expansível primeiro
                                     const channelId = srv.channel.id;
