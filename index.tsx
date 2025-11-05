@@ -11,7 +11,7 @@ import definePlugin from "@utils/types";
 import { ChannelRouter, ChannelStore, FluxDispatcher, GuildStore, Menu, NavigationRouter } from "@webpack/common";
 
 import { JoinerChatBarIcon } from "./JoinerIcon";
-import { JoinerSettings, recentJoinsStore,settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
+import { ITriggerSettings, JoinerSettings, recentJoinsStore, settings, TriggerKeywords } from "./settings";
 import { createLogger } from "./utils";
 
 const baselogger = createLogger("SolsAutoJoiner");
@@ -72,11 +72,19 @@ export default definePlugin({
     config: null as JoinerSettings | null,
     addRecentJoin(joinData: {
         title: string;
-        author: string;
         image?: string;
         description: string;
-        code: string;
-        type: string;
+        message: { id: string; jumpUrl?: string };
+        author: { name: string; avatar?: string; };
+        channel: { id: string; name: string; };
+        guild: { id: string; name: string; icon?: string; };
+        link: {
+            code: string;
+            type: "share" | "private";
+            joinHappened: boolean;
+            wasVerified: boolean;
+            isSafe: boolean;
+        };
     }) {
         recentJoinsStore.add(joinData);
     },
@@ -222,9 +230,8 @@ export default definePlugin({
     detectTriggerKeywords(text: string, logger: any = baselogger): string[] {
         const normalized = text.toLowerCase();
         return Object.entries(TriggerKeywords)
-            // .filter(([biome]) => this.config![biome as keyof TriggerKeywordSettings]) // only enabled biomes (WRONG! we dont care if its enabled or not, just if it has keywords)
-            .filter(([_, keywords]) =>
-                keywords.some(kw => {
+            .filter(([_, value]) =>
+                value.keywords.some(kw => {
                     // eslint-disable-next-line @stylistic/quotes
                     const pattern = new RegExp(`\\b${kw.replace(/\s+/g, '\\s+')}\\b`, "i");
                     return pattern.test(normalized);
@@ -546,6 +553,7 @@ export default definePlugin({
         }
 
         // log.info("Message:", content, embed_contents);
+        log.perf("Author: message.author", message.author);
         const authorUsername = message.author?.username ?? "Unknown User";
         const channelName = ChannelStore.getChannel(channelId)?.name ?? "Unknown Channel";
         const guildName = GuildStore.getGuild(ChannelStore.getChannel(channelId)?.guild_id)?.name ?? "Unknown Guild";
@@ -567,6 +575,7 @@ export default definePlugin({
         // What biome is it?
         const triggerWordsMatched = this.detectTriggerKeywords(content);
         const match = triggerWordsMatched?.[0];
+        const matchName = TriggerKeywords[match as keyof typeof TriggerKeywords]?.name ?? "KEYWORD_MATCH_FAILED";
         if (triggerWordsMatched.length === 0) {
             log.info(`❌ ${link.code} (${link.type}) did not match any enabled. (at +${timeTaken()})`);
             return;
@@ -577,13 +586,13 @@ export default definePlugin({
         }
 
         // Is the biome enabled?
-        const isBiomeEnabled = Boolean(this.config?.[match as keyof TriggerKeywordSettings]);
+        const isBiomeEnabled = Boolean(this.config?.[match as keyof ITriggerSettings]);
         if (!isBiomeEnabled) {
-            log.info(`🚫 ${link.code} (${link.type}) matched  "${match}" but it is disabled in config. (at +${timeTaken()})`);
+            log.info(`🚫 ${link.code} (${link.type}) matched  "${matchName}" but it is disabled in config. (at +${timeTaken()})`);
             return;
         }
 
-        log.debug(`✅ Code ${link.code} (${link.type}) matched: ${match} (at +${timeTaken()})`);
+        log.debug(`✅ Code ${link.code} (${link.type}) matched: ${matchName} (at +${timeTaken()})`);
 
         const shouldNotifyThisMessage = this.config!.notifyEnabled; // snapshot the value before autojoin, because it MIGHT disable from this.config directly
         const snapshotJoinEnabled = this.config!.joinEnabled;
@@ -604,13 +613,34 @@ export default definePlugin({
             }
 
             if (joinHappened) {
+                const trigger = TriggerKeywords[match as keyof typeof TriggerKeywords];
                 this.addRecentJoin({
-                    title: match, // biome como título
-                    author: authorUsername,
-                    image: "https://discord.com/assets/dcce7481d64c9441.svg", // placeholder; pode ser dinâmico por biome se quiser
-                    description: `Joined in ${channelName} (${guildName})`, // base; o "X ago" é computado no render
-                    code: link.code,
-                    type: link.type,
+                    title: trigger.name,
+                    image: trigger.iconUrl || "https://discord.com/assets/881ed827548f38c6.svg", // fallback question mark
+                    description: `On channel #${channelName} (${guildName})`, // base; o "X ago" é computado no render
+                    author: {
+                        name: authorUsername,
+                        avatar: `https://cdn.discordapp.com/avatars/${message.author?.id}/${message.author?.avatar}.png`,
+                    },
+                    message: {
+                        id: message.id,
+                        jumpUrl: `https://discord.com/channels/${ChannelStore.getChannel(channelId)?.guild_id}/${channelId}/${message.id}`,
+                    },
+                    channel: {
+                        id: channelId,
+                        name: channelName,
+                    },
+                    guild: {
+                        id: ChannelStore.getChannel(channelId)?.guild_id,
+                        name: guildName,
+                    },
+                    link: {
+                        code: link.code,
+                        type: link.type,
+                        joinHappened: joinHappened,
+                        wasVerified: wasVerified,
+                        isSafe: isSafe
+                    }
                 });
             }
 
@@ -651,7 +681,7 @@ export default definePlugin({
                 }
             }
 
-            const title = `🎯 SAJ :: Detected ${match}`;
+            const title = `🎯 SAJ :: Detected ${matchName}`;
             const body = [
                 `Server: ${link.code} (${link.type})`,
                 `In channel: ${channelName} (${guildName})`,

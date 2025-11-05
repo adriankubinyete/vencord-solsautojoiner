@@ -9,9 +9,9 @@ import { FormSwitch } from "@components/FormSwitch";
 import { Margins } from "@components/margins";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
 import { OptionType } from "@utils/types";
-import { Button, ChannelRouter, ChannelStore, Forms, React, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
+import { Button, ChannelRouter, ChannelStore, Forms, NavigationRouter, React, SearchableSelect, SelectedChannelStore, Toasts } from "@webpack/common";
 
-import { recentJoinsStore, settings, TriggerKeywords, TriggerKeywordSettings } from "./settings";
+import { ITriggerSettings, recentJoinsStore, settings, TriggerKeywords } from "./settings";
 import { cl, getSettingMeta } from "./utils";
 
 function Note({
@@ -452,59 +452,6 @@ function DebugButton() {
     );
 }
 
-
-// export function RecentServersListButton() {
-//     const [menuOpen, setMenuOpen] = React.useState(false);
-
-//     const toggleMenu = () => setMenuOpen(prev => !prev);
-
-//     return (
-//         <div style={{ position: "relative", width: "100%" }}>
-//             <Button
-//                 width={"100%"}
-//                 size={Button.Sizes.SMALL}
-//                 onClick={toggleMenu}
-//             >
-//                 {menuOpen ? "Hide Recent Servers" : "Show Recent Servers"}
-//             </Button>
-
-//             <div
-//                 style={{
-//                     overflow: "hidden",
-//                     transition: "max-height 0.3s ease, opacity 0.3s ease",
-//                     maxHeight: menuOpen ? 300 : 0,
-//                     opacity: menuOpen ? 1 : 0,
-//                     marginTop: 8,
-//                     background: "rgba(255,255,255,0.05)",
-//                     borderRadius: 8,
-//                     padding: menuOpen ? 10 : 0,
-//                 }}
-//             >
-//                 <Forms.FormTitle tag="h4" style={{ marginBottom: 6 }}>
-//                     Recently Notified Servers
-//                 </Forms.FormTitle>
-
-//                 {[1, 2, 3].map(i => (
-//                     <div
-//                         key={i}
-//                         style={{
-//                             padding: "6px 8px",
-//                             background: "rgba(255,255,255,0.08)",
-//                             borderRadius: 6,
-//                             marginBottom: 6,
-//                         }}
-//                     >
-//                         <b>Server #{i}</b>
-//                         <div style={{ fontSize: 12, color: "#ccc" }}>
-//                             Example info about this server.
-//                         </div>
-//                     </div>
-//                 ))}
-//             </div>
-//         </div>
-//     );
-// }
-
 function formatTimeAgo(timestamp: number): string {
     const now = Date.now();
     const diff = now - timestamp;
@@ -516,28 +463,34 @@ function formatTimeAgo(timestamp: number): string {
 
 type JoinedServerCardProps = {
     author: string;
+    authorAvatar?: string; // novo: avatar do author (opcional)
     image?: string;
     title: string;
     description: string;
     timeAgo: string;
+    safety?: boolean;
     onClick?: () => void;
 };
 
 export function JoinedServerCard({
     author,
+    authorAvatar,
     image,
     title,
     description,
     timeAgo,
+    safety,
     onClick,
 }: JoinedServerCardProps) {
+    const avatarUrl = authorAvatar || "https://discord.com/assets/881ed827548f38c6.svg"; // fallback interrogação
+
     return (
         <div
             onClick={onClick}
             style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
+                gap: 14,
                 padding: "8px 10px",
                 background: "rgba(255,255,255,0.08)",
                 borderRadius: 6,
@@ -556,14 +509,14 @@ export function JoinedServerCard({
                 (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
             }}
         >
-            {/* Imagem do servidor */}
+            {/* Imagem do servidor (opcional, ao lado) */}
             {image && (
                 <img
                     src={image}
                     alt={title}
                     style={{
-                        width: 38,
-                        height: 38,
+                        width: 44,
+                        height: 44,
                         borderRadius: 6,
                         objectFit: "cover",
                     }}
@@ -582,19 +535,41 @@ export function JoinedServerCard({
                 )}
                 <div
                     style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                         fontSize: 11,
                         color: "#999",
                         marginTop: 3,
                     }}
                 >
-                    Joined by {author} • {timeAgo}
+                    {/* Bolinha do avatar do author, inline à esquerda do texto */}
+                    <img
+                        src={avatarUrl}
+                        alt={`${author}'s avatar`}
+                        style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: "50%", // bolinha redonda
+                            objectFit: "cover",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                    />
+                    <span>
+                        Sent by {author} • {timeAgo}
+                        {safety !== undefined && (
+                            <span style={{ marginLeft: 8, color: safety ? "#3ba55c" : "#ed4245", fontWeight: "bold" }}>
+                                {safety ? "✅ Safe" : "❌ Fake"}
+                            </span>
+                        )}
+                    </span>
                 </div>
             </div>
         </div>
     );
 }
 
-export function RecentServersListButton() {
+export function RecentServersListButton({ onClose }: { onClose?: () => void }) {
     const [menuOpen, setMenuOpen] = React.useState(false);
     const toggleMenu = () => setMenuOpen(prev => !prev);
 
@@ -630,7 +605,7 @@ export function RecentServersListButton() {
                     overflowY: menuOpen ? "auto" : "hidden",
                     overflowX: "hidden",
                     opacity: menuOpen ? 1 : 0,
-                    maxHeight: menuOpen ? 300 : 0, // altura limite p/ ~5 cards
+                    maxHeight: menuOpen ? 300 : 0,
                     transform: menuOpen ? "translateY(0)" : "translateY(-6px)",
                     transition:
                         "max-height 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), " +
@@ -668,13 +643,19 @@ export function RecentServersListButton() {
                         >
                             <JoinedServerCard
                                 title={srv.title}
-                                author={srv.author}
+                                author={srv.author.name}
+                                authorAvatar={srv.author.avatar}
                                 image={srv.image}
                                 description={srv.description}
                                 timeAgo={formatTimeAgo(srv.timestamp)}
+                                safety={srv.link.isSafe}
                                 onClick={() => {
-                                    console.log(`Re-join ${srv.title} (code: ${srv.code}, type: ${srv.type})`);
-                                    // TODO: Implement re-join logic, e.g., copy code to clipboard or trigger join
+                                    setMenuOpen(false); // fecha o menu expansível primeiro
+                                    const channelId = srv.channel.id;
+                                    const messageId = srv.message.id;
+                                    const guildId = srv.guild.id;
+                                    NavigationRouter.transitionTo(`/channels/${guildId}/${channelId}/${messageId}`);
+                                    onClose?.(); // fecha o modal
                                 }}
                             />
                         </div>
@@ -701,35 +682,37 @@ export function JoinerModal({ rootProps }: { rootProps: ModalProps; }) {
             </ModalHeader>
 
             <ModalContent className={cl("modal-content")}>
-                <RecentServersListButton />
+                <RecentServersListButton onClose={rootProps.onClose} />
                 <SectionTitle>On link detection</SectionTitle>
                 <Setting setting="joinEnabled" />
                 <Setting setting="notifyEnabled" />
 
                 <SectionTitle>Triggers</SectionTitle>
-                {(Object.keys(TriggerKeywords) as (keyof TriggerKeywordSettings)[]).map((triggerKey, index) => {
-                    const keywords = TriggerKeywords[triggerKey].join(", ");
+                {Object.entries(TriggerKeywords)
+                    .map(([triggerKey, trigger], index) => {
+                        const keywords = trigger.keywords.join(", ");
+                        const displayName = trigger.name; // usa nome pretty como "Glitched"
 
-                    const style = !reactive.uiShowKeywords && index > 0 ? { marginTop: -10 } : undefined;
+                        const style = !reactive.uiShowKeywords && index > 0 ? { marginTop: -10 } : undefined;
 
-                    return reactive.uiShowKeywords ? (
-                        <>
+                        return reactive.uiShowKeywords ? (
+                            <>
+                                <Setting
+                                    setting={triggerKey as keyof ITriggerSettings}
+                                    customTitle={displayName}
+                                />
+                                <Note style={{ marginTop: -20, marginBottom: 8 }}>
+                                    {keywords}
+                                </Note>
+                            </>
+                        ) : (
                             <Setting
-                                setting={triggerKey}
-                                customTitle={triggerKey}
+                                style={style}
+                                setting={triggerKey as keyof ITriggerSettings}
+                                customTitle={displayName}
                             />
-                            <Note style={{ marginTop: -20, marginBottom: 8 }}>
-                                {keywords}
-                            </Note>
-                        </>
-                    ) : (
-                        <Setting
-                            style={style}
-                            setting={triggerKey}
-                            customTitle={triggerKey}
-                        />
-                    );
-                })}
+                        );
+                    })}
                 <SectionHorizontalLine />
                 <Setting setting="uiShowKeywords" />
 

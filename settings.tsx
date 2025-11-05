@@ -163,19 +163,19 @@ export const settings = definePluginSettings({
     /*
     * Developer options
     */
-   _dev_logging_level: {
-       type: OptionType.SELECT,
-       description: "Console logging level",
-       default: "info",
-       options: [
-           { label: "Trace", value: "trace" },
-           { label: "Debug", value: "debug" },
-           { label: "Performance", value: "perf" },
-           { label: "Info", value: "info" },
-           { label: "Warn", value: "warn" },
-           { label: "Error", value: "error" },
-       ]
-   },
+    _dev_logging_level: {
+        type: OptionType.SELECT,
+        description: "Console logging level",
+        default: "info",
+        options: [
+            { label: "Trace", value: "trace" },
+            { label: "Debug", value: "debug" },
+            { label: "Performance", value: "perf" },
+            { label: "Info", value: "info" },
+            { label: "Warn", value: "warn" },
+            { label: "Error", value: "error" },
+        ]
+    },
     _dev_dedupe_link_cooldown_ms: {
         type: OptionType.NUMBER,
         description: "Cooldown in milliseconds to ignore duplicate links",
@@ -189,7 +189,7 @@ export const settings = definePluginSettings({
 });
 
 // Config geral do plugin
-export interface PluginSettings {
+export interface ICoreSettings {
     joinEnabled: boolean;
     notifyEnabled: boolean;
     joinCloseGameBefore: boolean;
@@ -212,7 +212,7 @@ export interface PluginSettings {
 }
 
 // Config dos biomes
-export interface TriggerKeywordSettings {
+export interface ITriggerSettings {
     GLITCHED: boolean;
     DREAMSPACE: boolean;
     BLOODRAIN: boolean;
@@ -230,47 +230,135 @@ export interface TriggerKeywordSettings {
     JESTER: boolean;
 }
 
-// Junta plugin + biomes
-export type JoinerSettings = PluginSettings & TriggerKeywordSettings;
+export type JoinerSettings = ICoreSettings & ITriggerSettings;
 
-// Palavras-chave por biome
-export const TriggerKeywords: Record<keyof TriggerKeywordSettings, string[]> = {
-    GLITCHED: ["glitch", "glitched", "glich", "glith"], // broken keywords because people freak out and type wrong
-    DREAMSPACE: ["dream", "dream space", "dreamspace"],
-    BLOODRAIN: ["blood rain", "blood", "bloodrain"],
-    PUMPKINMOON: ["pump", "pumpkin", "pmoon"],
-    GRAVEYARD: ["grave", "graveyard", "grave yard"],
-    NULL: ["null"],
-    CORRUPTION: ["corruption", "corrupt"],
-    HELL: ["hell"],
-    STARFALL: ["starfall", "star fall"],
-    SANDSTORM: ["sand", "sand storm", "sandstorm"],
-    SNOWY: ["snowy"],
-    WINDY: ["windy"],
-    RAINY: ["rainy"],
-    MARI: ["mari", "voidcoin", "void coin"],
-    JESTER: ["jester", "oblivion"],
-};
+export const TriggerKeywords = {
+    GLITCHED: {
+        type: "biome",
+        name: "Glitched",
+        keywords: ["glitch", "glitched", "glich", "glith"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/GLITCHED.png"
+    },
+    DREAMSPACE: {
+        type: "biome",
+        name: "Dreamspace",
+        keywords: ["dream", "dream space", "dreamspace"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/DREAMSPACE.png"
+    },
+    BLOODRAIN: {
+        type: "biome",
+        name: "Blood Rain",
+        keywords: ["blood rain", "blood", "bloodrain"],
+        iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/main/assets/blood%20rain.png"
+    },
+    PUMPKINMOON: {
+        type: "biome",
+        name: "Pumpkin Moon",
+        keywords: ["pump", "pumpkin", "pmoon"],
+        iconUrl: "https://raw.githubusercontent.com/xVapure/Noteab-Macro/refs/heads/main/images/pumpkin_moonv2.png"
+    },
+    GRAVEYARD: {
+        type: "biome",
+        name: "Graveyard",
+        keywords: ["grave", "graveyard", "grave yard"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/GRAVEYARD.png"
+    },
+    NULL: {
+        type: "biome",
+        name: "Null",
+        keywords: ["null"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/NULL.png"
+    },
+    CORRUPTION: {
+        type: "biome",
+        name: "Corruption",
+        keywords: ["corruption", "corrupt"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/CORRUPTION.png"
+    },
+    HELL: {
+        type: "biome",
+        name: "Hell",
+        keywords: ["hell"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/HELL.png"
+    },
+    STARFALL: {
+        type: "biome",
+        name: "Starfall",
+        keywords: ["starfall", "star fall"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/STARFALL.png"
+    },
+    SANDSTORM: {
+        type: "biome",
+        name: "Sandstorm",
+        keywords: ["sand", "sand storm", "sandstorm"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/SAND%20STORM.png"
+    },
+    SNOWY: {
+        type: "biome",
+        name: "Snowy",
+        keywords: ["snowy"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/SNOWY.png"
+    },
+    WINDY: {
+        type: "biome",
+        name: "Windy",
+        keywords: ["windy"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/WINDY.png"
+    },
+    RAINY: {
+        type: "biome",
+        name: "Rainy",
+        keywords: ["rainy"],
+        iconUrl: "https://maxstellar.github.io/biome_thumb/RAINY.png"
+    },
+    MARI: {
+        type: "merchant",
+        name: "Mari",
+        keywords: ["mari", "voidcoin", "void coin"],
+        iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/mari.png"
+    },
+    JESTER: {
+        type: "merchant",
+        name: "Jester",
+        keywords: ["jester", "oblivion"],
+        iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/jester.png"
+    },
+ } as const;
 
-// Store não-persistente para joins recentes
 export const recentJoinsStore = {
     recentJoins: [] as Array<{
         id: number;
-        title: string;
-        author: string;
-        image?: string;
-        description: string;
         timestamp: number;
-        code: string;
-        type: string;
+        title: string; // nome do biome/merchant
+        image?: string; // iconUrl ou fallback
+        description: string; // ex: "On channel #name (guild)"
+        message: { id: string; jumpUrl?: string };
+        author: { name: string; avatar?: string };
+        channel: { id: string; name: string };
+        guild: { id: string; name: string; icon?: string };
+        link: {
+            code: string;
+            type: "share" | "private";
+            joinHappened: boolean;
+            wasVerified: boolean;
+            isSafe: boolean;
+        };
     }>,
     add(joinData: {
         title: string;
-        author: string;
         image?: string;
         description: string;
-        code: string;
-        type: string;
+        message: { id: string; jumpUrl?: string };
+        author: { name: string; avatar?: string };
+        channel: { id: string; name: string };
+        guild: { id: string; name: string; icon?: string };
+        link: {
+            code: string;
+            type: "share" | "private";
+            joinHappened: boolean;
+            wasVerified: boolean;
+            isSafe: boolean;
+        };
     }) {
         const now = Date.now();
         const newJoin = {
