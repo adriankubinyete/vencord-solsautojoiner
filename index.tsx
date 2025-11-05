@@ -534,14 +534,26 @@ export default definePlugin({
     * Message Handler
     */
 
-    async handleNewMessage(data: { channelId: string; message: any; }) {
+    async handleNewMessage(data: { channelId: string; message: any; optimistic?: boolean; }) {
         const log = baselogger.inherit(`${data?.message?.id}.handleNewMessage`);
         const msgStart = performance.now();
         const timeTaken = () => `${(performance.now() - msgStart).toFixed(2)}ms`;
 
         // Is it a valid message?
-        const { channelId, message } = data;
+        const { channelId, optimistic, message } = data;
         const authorId = message.author?.id ?? "Unknown ID";
+
+        if (optimistic || message.state === "SENDING") {
+            log.trace(`[MessageTest:${message.id}] Ignoring local/optimistic message.`);
+            return;
+        }
+
+        if (!message.guild_id) {
+            log.trace(`[MessageTest:${message.id}] Ignoring message without guild.`);
+            return;
+        }
+
+        // log.trace(`[MessageTest:${message.id}] Valid message (most likely)`);  // too granular, will make too much spam on console
         if (!this.channelIsBeingMonitored(channelId)) return;
         if (this.userIsBlocked(authorId)) return;
 
@@ -556,7 +568,8 @@ export default definePlugin({
         log.perf("Author: message.author", message.author);
         const authorUsername = message.author?.username ?? "Unknown User";
         const channelName = ChannelStore.getChannel(channelId)?.name ?? "Unknown Channel";
-        const guildName = GuildStore.getGuild(ChannelStore.getChannel(channelId)?.guild_id)?.name ?? "Unknown Guild";
+        const guildId = message.guild_id;
+        const guildName = GuildStore.getGuild(guildId)?.name ?? "Unknown Guild";
 
         // What is the server link?
         const link = this.getLinkFromMessageContent(content);
@@ -593,6 +606,7 @@ export default definePlugin({
         }
 
         log.debug(`✅ Code ${link.code} (${link.type}) matched: ${matchName} (at +${timeTaken()})`);
+        log.perf(`[MessageTest] [this is the one that passed] ${JSON.stringify(data)}`);
 
         const shouldNotifyThisMessage = this.config!.notifyEnabled; // snapshot the value before autojoin, because it MIGHT disable from this.config directly
         const snapshotJoinEnabled = this.config!.joinEnabled;
