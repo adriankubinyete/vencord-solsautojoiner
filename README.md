@@ -65,6 +65,14 @@ You'll know where to install this repository once you read and understand their 
 
 ---
 
+## Sources/References
+
+- <https://docs.vencord.dev/installing/custom-plugins/>
+- <https://github.com/Vendicated/Vencord/tree/main/src/plugins> (for comparing code and discovering how some things are implemented)
+- <https://blog.csdn.net/gitblog_01053/article/details/151450995>
+
+---
+
 ## Post-notes
 This project was severely vibe-coded with chatgpt and grok at like 3am in the morning. 
 Made with ❤️ to whoever finds it useful.

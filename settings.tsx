@@ -163,7 +163,7 @@ export const settings = definePluginSettings({
     /*
     * Developer options
     */
-    _dev_logging_level: {
+    loggingLevel: {
         type: OptionType.SELECT,
         description: "Console logging level",
         default: "info",
@@ -186,6 +186,11 @@ export const settings = definePluginSettings({
         description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
         default: 5000
     },
+    monitorGreedyMode: {
+        type: OptionType.BOOLEAN,
+        description: "Ignore monitorChannelList and simply monitor all possible channels.",
+        default: false
+    }
 });
 
 // Config geral do plugin
@@ -207,8 +212,9 @@ export interface ICoreSettings {
     verifyBlockedPlaceIds: string;
     verifyAfterJoinFailFallbackDelayMs: number;
     verifyAfterJoinFailFallbackAction: "joinSols" | "quit";
-    _dev_logging_level: "trace" | "debug" | "perf" | "info" | "warn" | "error";
+    loggingLevel: "trace" | "debug" | "perf" | "info" | "warn" | "error";
     _dev_dedupe_link_cooldown_ms: number;
+    monitorGreedyMode: boolean;
 }
 
 // Config dos biomes
@@ -324,55 +330,3 @@ export const TriggerKeywords = {
         iconUrl: "https://raw.githubusercontent.com/vexthecoder/OysterDetector/refs/heads/main/assets/jester.png"
     },
  } as const;
-
-export const recentJoinsStore = {
-    recentJoins: [] as Array<{
-        id: number;
-        timestamp: number;
-        title: string; // nome do biome/merchant
-        image?: string; // iconUrl ou fallback
-        description: string; // ex: "On channel #name (guild)"
-        message: { id: string; jumpUrl?: string };
-        author: { name: string; avatar?: string };
-        channel: { id: string; name: string };
-        guild: { id: string; name: string; icon?: string };
-        link: {
-            code: string;
-            type: "share" | "private";
-            joinHappened: boolean;
-            wasVerified: boolean;
-            isSafe: boolean;
-        };
-    }>,
-    add(joinData: {
-        title: string;
-        image?: string;
-        description: string;
-        message: { id: string; jumpUrl?: string };
-        author: { name: string; avatar?: string };
-        channel: { id: string; name: string };
-        guild: { id: string; name: string; icon?: string };
-        link: {
-            code: string;
-            type: "share" | "private";
-            joinHappened: boolean;
-            wasVerified: boolean;
-            isSafe: boolean;
-        };
-    }) {
-        const now = Date.now();
-        const newJoin = {
-            id: now,
-            timestamp: now,
-            ...joinData
-        };
-
-        this.recentJoins.unshift(newJoin);
-        if (this.recentJoins.length > 10) {
-            this.recentJoins.pop();
-        }
-    },
-    clear() {
-        this.recentJoins.length = 0;
-    }
-};
