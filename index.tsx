@@ -11,7 +11,7 @@ import { ChannelRouter, ChannelStore, GuildStore, Menu, NavigationRouter } from 
 
 import { settings, TriggerKeywords } from "./settings";
 import { CustomChatBarButton } from "./ui/ChatBarButton";
-import { ChannelTypes, createLogger,jumpToMessage, sendNotification } from "./utils/index";
+import { ChannelTypes, createLogger, jumpToMessage, sendNotification } from "./utils/index";
 import { recentJoinStore } from "./utils/RecentJoinStore";
 import { IJoinData, RobloxLinkHandler } from "./utils/RobloxLinkHandler";
 
@@ -210,6 +210,20 @@ export default definePlugin({
                                 break;
                         }
                     }, settings.store.verifyAfterJoinFailFallbackDelayMs);
+                }
+
+                // respeita disableAfterAutoJoin, EXCETO se for uma bait
+                if (joinData && joinData.joined) {
+                    const isBait = joinData.verified === true && joinData.safe === false;
+
+                    if (!isBait) {
+                        if (settings.store.joinDisableAfterAutoJoin) {
+                            settings.store.joinEnabled = false;
+                        }
+                        if (settings.store.notifyDisableAfterAutoJoin) {
+                            settings.store.notifyEnabled = false;
+                        }
+                    }
                 }
             }
 
