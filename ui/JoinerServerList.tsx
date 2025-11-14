@@ -7,6 +7,7 @@
 import { Button, NavigationRouter, React, Toasts } from "@webpack/common";
 
 import { formatTimeAgo, showToast } from "../utils";
+import { recentJoinStore } from "../utils/RecentJoinStore";
 
 type JoinedServer = {
     id?: number;
@@ -31,8 +32,27 @@ type JoinedServerListProps = {
 
 export function JoinedServerList({ joins, onClose }: JoinedServerListProps) {
     const [expanded, setExpanded] = React.useState(false);
+    const [localJoins, setLocalJoins] = React.useState(joins || []); // Estado local pra sync
     const toggleExpanded = () => setExpanded(prev => !prev);
-    const count = joins?.length ?? 0;
+    const count = localJoins.length;
+
+    // Sync com prop inicial (caso venha de fora)
+    React.useEffect(() => {
+        setLocalJoins(joins || []);
+    }, [joins]);
+
+    // Opcional: Poll simples pra checar store a cada 1s (se add() for chamado em outro lugar)
+    // Mas pra clear, vamos forçar no handler abaixo
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            const current = recentJoinStore.all;
+            if (JSON.stringify(current) !== JSON.stringify(localJoins)) {
+                setLocalJoins(current);
+            }
+        }, 1000); // 1s é leve, ajusta se quiser
+
+        return () => clearInterval(interval);
+    }, [localJoins]);
 
     const handleCardClick = (join: JoinedServer) => {
         try {
@@ -48,6 +68,12 @@ export function JoinedServerList({ joins, onClose }: JoinedServerListProps) {
             showToast("Something went wrong!", Toasts.Type.FAILURE);
             console.error("[SolsRadar] Failed to jump to message:", err);
         }
+    };
+
+    const handleClearJoins = () => {
+        recentJoinStore.clear();
+        setLocalJoins([]); // FORÇA o update imediato no estado local
+        showToast("Cleared recent joins!", Toasts.Type.SUCCESS);
     };
 
     return (
@@ -75,7 +101,7 @@ export function JoinedServerList({ joins, onClose }: JoinedServerListProps) {
                     transition: "background 0.2s ease",
                 }}
             >
-                <span>{expanded ? "Hide recents" : "Show recents"}</span>
+                <span>{expanded ? `Hide recents (${count})` : `Show recents (${count})`}</span>
                 <span
                     style={{
                         display: "inline-block",
@@ -112,10 +138,26 @@ export function JoinedServerList({ joins, onClose }: JoinedServerListProps) {
                     scrollbarColor: "rgba(255,255,255,0.2) transparent",
                     display: "flex",
                     flexDirection: "column",
-                    gap: expanded ? 8 : 0, // espaçamento entre os cards
+                    gap: expanded ? 8 : 0,
                 }}
             >
-                {(!joins || joins.length === 0) ? (
+                {expanded && count > 0 && (
+                    <Button
+                        width="100%"
+                        size={Button.Sizes.SMALL}
+                        onClick={handleClearJoins}
+                        color={Button.Colors.RED}
+                        style={{
+                            marginBottom: 8,
+                            fontWeight: 500,
+                            transition: "background 0.2s ease",
+                        }}
+                    >
+                        Clear recent joins
+                    </Button>
+                )}
+
+                {count === 0 ? (
                     <div
                         style={{
                             color: "#aaa",
@@ -127,7 +169,7 @@ export function JoinedServerList({ joins, onClose }: JoinedServerListProps) {
                         No recent joins yet.
                     </div>
                 ) : (
-                    joins.map((join, index) => (
+                    localJoins.map((join, index) => (
                         <div
                             key={join.messageJumpUrl || join.id}
                             style={{
