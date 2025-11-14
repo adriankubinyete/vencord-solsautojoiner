@@ -1,6 +1,6 @@
-# SolsAutoJoiner
+# SolsRadar
 
-**SolsAutoJoiner** is a Vencord plugin for Discord that monitors specific channels for private Roblox server links and allows quick access to those servers.  
+**SolsRadar** is a Vencord plugin for Discord that monitors specific channels for private Roblox server links and allows quick access to those servers.  
 It was created for me, as an alternative to "selfbotting" snipers (which I personally don't like) and, as an integrated Vencord plugin, provides easier setup and smoother operation once installed.
 
 ---

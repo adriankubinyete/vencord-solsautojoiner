@@ -10,7 +10,7 @@ import { Forms, React } from "@webpack/common";
 import { ITriggerSettings, settings, TriggerKeywords } from "../settings";
 import { cl } from "../utils";
 import { recentJoinStore } from "../utils/RecentJoinStore";
-import { Line, Note, Section, SectionMessage, SectionTitle, Setting } from "./BasicComponents";
+import { BaseButton, Line, Note, Section, SectionMessage, SectionTitle, Setting } from "./BasicComponents";
 import { JoinedServerList } from "./JoinerServerList";
 
 export function PluginModal({ rootProps }: { rootProps: ModalProps; }) {
@@ -55,33 +55,6 @@ export function PluginModal({ rootProps }: { rootProps: ModalProps; }) {
 
             <ModalContent className={cl("modal-content")}>
                 <SectionTitle>Recent Joins</SectionTitle>
-                {/* Botão para adicionar join fake*/}
-                {/* <button
-                    onClick={addFakeJoin}
-                    style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "var(--brand-experiment)",
-                        border: "none",
-                        color: "#fff",
-                        fontWeight: 600,
-                        fontSize: 13,
-                        borderRadius: 6,
-                        padding: "6px 10px",
-                        cursor: "pointer",
-                        marginBottom: 8,
-                        transition: "background 0.2s ease",
-                    }}
-                    onMouseEnter={e =>
-                        (e.currentTarget.style.background = "var(--brand-experiment-560)")
-                    }
-                    onMouseLeave={e =>
-                        (e.currentTarget.style.background = "var(--brand-experiment)")
-                    }
-                >
-                    ➕ Add Fake Join (dev)
-                </button> */}
                 <JoinedServerList joins={joins} onClose={rootProps.onClose} />
 
                 <Section title="Main Options" defaultOpen>
@@ -147,9 +120,16 @@ export function PluginModal({ rootProps }: { rootProps: ModalProps; }) {
                     <Setting setting="uiShowKeywords" customTitle="🟦 Show trigger keywords" />
                 </Section>
 
+                <Section title="Other Options" defaultOpen>
+                    <Setting setting="monitorNavigateToChannelsOnStartup" customTitle="🟦 Load Channels on Startup" />
+                    <Setting setting="monitorGreedyMode" customTitle="🟦 Greedy Mode" />
+                    <Setting setting="monitorGreedyExceptionList" customTitle="🟦 Greedy Mode Exception List" />
+                </Section>
+
                 <Section title="Developer Options" defaultOpen>
                     <Setting setting="loggingLevel" customTitle="Console Logging Level" />
                     <Setting setting="_dev_verification_fail_fallback_delay_ms" customTitle="Verification Fail Fallback Delay (ms)" />
+                    <BaseButton onClick={addFakeJoin}>➕ Add Fake Join</BaseButton>
                 </Section>
 
             </ModalContent>

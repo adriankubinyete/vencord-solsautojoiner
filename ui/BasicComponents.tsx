@@ -8,10 +8,41 @@ import { CheckedTextInput } from "@components/CheckedTextInput";
 import { FormSwitch } from "@components/FormSwitch";
 import { Margins } from "@components/margins";
 import { OptionType } from "@utils/types";
-import { React, SearchableSelect } from "@webpack/common";
+import { Button, React, SearchableSelect } from "@webpack/common";
 
 import { settings } from "../settings";
 import { getSettingMeta } from "../utils";
+
+type BaseButtonProps = {
+    onClick: () => void;
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+};
+
+export function BaseButton({ onClick, children, style }: BaseButtonProps) {
+    return (
+        <div style={{ width: "100%" }}>
+            <Button
+                width="100%"
+                size={Button.Sizes.SMALL}
+                onClick={onClick}
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    fontWeight: 500,
+                    transition: "background 0.2s ease",
+                    marginBottom: 12,
+                    width: "100%",
+                    ...style,
+                }}
+            >
+                {children}
+            </Button>
+        </div>
+    );
+}
 
 export function Note({
     children,

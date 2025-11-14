@@ -54,7 +54,7 @@ const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channe
 };
 
 export default definePlugin({
-    name: PLUGIN_NAME,
+    name: "SolsRadar",
     description: "Does Sol's RNG stuff",
     authors: [{ name: "masutty", id: 188851299255713792n }],
     settings,
@@ -145,6 +145,7 @@ export default definePlugin({
             if (isUserBlocked(message.author.id)) return;
             // log.trace("settings.store._dev_greedy_monitoring : ", settings.store._dev_greedy_monitoring, "isMonitoredChannel(channelId) : ", isMonitoredChannel(channelId));
             if (!settings.store.monitorGreedyMode && !isMonitoredChannel(channelId)) return; // assures that channel is monitored or we are in greedy mode
+            if (settings.store.monitorGreedyMode && isGreedyIgnoredChannel(channelId)) return;
 
             const ro = new RobloxLinkHandler(settings, log);
             const link = ro.extract(message.content); // get link from msg content
@@ -261,6 +262,10 @@ export default definePlugin({
 
 function isMonitoredChannel(channelId: string) {
     return new Set(settings.store.monitorChannelList.split(",").map(id => id.trim()).filter(Boolean)).has(channelId);
+}
+
+function isGreedyIgnoredChannel(channelId: string) {
+    return new Set(settings.store.monitorGreedyExceptionList.split(",").map(id => id.trim()).filter(Boolean)).has(channelId);
 }
 
 function isUserBlocked(userId: string) {

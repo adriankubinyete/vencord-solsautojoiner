@@ -95,6 +95,16 @@ export const settings = definePluginSettings({
         description: "Automatically put users who post unsafe server links into the monitorBlockedUserList.",
         default: false
     },
+    monitorGreedyMode: {
+        type: OptionType.BOOLEAN,
+        description: "Ignore monitorChannelList and simply monitor all possible channels.",
+        default: false
+    },
+    monitorGreedyExceptionList: {
+        type: OptionType.STRING,
+        description: "Comma-separated channel IDs to ignore when using greedy mode.",
+        default: ""
+    },
 
     /*
     * Link verification
@@ -186,11 +196,7 @@ export const settings = definePluginSettings({
         description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
         default: 5000
     },
-    monitorGreedyMode: {
-        type: OptionType.BOOLEAN,
-        description: "Ignore monitorChannelList and simply monitor all possible channels.",
-        default: false
-    }
+
 });
 
 // Config geral do plugin
