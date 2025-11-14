@@ -87,7 +87,7 @@ export const CustomChatBarButton: ChatBarButtonFactory = ({ isMainChat }) => {
 
     return (
         <ChatBarButton
-            tooltip="RoSniper Settings"
+            tooltip="SolsRadar Settings"
             onClick={handleClick}
             onContextMenu={handleContextMenu} // right click
             buttonProps={{
