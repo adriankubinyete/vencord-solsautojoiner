@@ -190,6 +190,7 @@ export default definePlugin({
                 if (wasJoined && !isBait) {
                     if (settings.store.joinDisableAfterAutoJoin) settings.store.joinEnabled = false;
                     if (settings.store.notifyDisableAfterAutoJoin) settings.store.notifyEnabled = false;
+                    if (settings.store._dev_joinAutomaticReenable) handleDebounce();
                 }
             }
 
@@ -346,4 +347,24 @@ async function handleJoin(ctx) {
     const isBait = hasResponse && joinData.verified === true && joinData.safe === false;
 
     return { joinData, wasJoined, isBait };
+}
+
+function handleDebounce(): void {
+    if (!settings.store._dev_joinAutomaticReenable) return;
+
+    const debounceMs = (settings.store._dev_joinAutomaticReenableDelaySeconds || 60) * 1000;
+    if (debounceMs <= 0) return;
+
+    // Immediately set to false (but only if it's currently true)
+    if (settings.store.joinEnabled) {
+        settings.store.joinEnabled = false;
+    }
+
+    // Schedule re-enable after debounceMs, but only if still false
+    setTimeout(() => {
+        if (settings.store.joinEnabled === false) {
+            settings.store.joinEnabled = true;
+        }
+        // If already true (user toggled early), do nothing
+    }, debounceMs);
 }

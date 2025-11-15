@@ -196,6 +196,18 @@ export const settings = definePluginSettings({
         description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
         default: 5000
     },
+    _dev_joinAutomaticReenable: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically re-enable auto-join after a successful join. Only useful with joinDisableAfterAutoJoin enabled.",
+        default: false,
+        hidden: true
+    },
+    _dev_joinAutomaticReenableDelaySeconds: {
+        type: OptionType.NUMBER,
+        description: "After a successful join, automatically re-enable auto-join after this many seconds.",
+        default: 60,
+        hidden: true
+    },
 
 });
 
@@ -219,8 +231,9 @@ export interface ICoreSettings {
     verifyAfterJoinFailFallbackDelayMs: number;
     verifyAfterJoinFailFallbackAction: "joinSols" | "quit";
     loggingLevel: "trace" | "debug" | "perf" | "info" | "warn" | "error";
-    _dev_dedupe_link_cooldown_ms: number;
     monitorGreedyMode: boolean;
+    _dev_joinDebounceEnabled: boolean;
+    _dev_joinDebounceMs: number;
 }
 
 // Config dos biomes
