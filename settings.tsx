@@ -20,17 +20,17 @@ export const settings = definePluginSettings({
     */
     joinEnabled: {
         type: OptionType.BOOLEAN,
-        description: "Automatically join valid Roblox share links detected.",
+        description: "Automatically join private server links which matches an enabled trigger.",
         default: false
     },
     notifyEnabled: {
         type: OptionType.BOOLEAN,
-        description: "Send a desktop notification when a valid Roblox share link is detected.",
+        description: "Send a desktop notification when a server link that matches an enabled trigger is detected.",
         default: false
     },
     joinCloseGameBefore: {
         type: OptionType.BOOLEAN,
-        description: "Close the game before joining. Makes your joins slightly slower.",
+        description: "Close any open Roblox game before joining. Makes you join slightly slower.",
         default: true
     },
 
@@ -39,12 +39,12 @@ export const settings = definePluginSettings({
     */
     joinDisableAfterAutoJoin: {
         type: OptionType.BOOLEAN,
-        description: "Disable automatic joins after a sucessful one join.",
+        description: "After a successful automatic join, disable auto-join.",
         default: true
     },
     notifyDisableAfterAutoJoin: {
         type: OptionType.BOOLEAN,
-        description: "Disable notifications after a sucessful automatic join.",
+        description: "After a successful automatic join, disable notifications.",
         default: false
     },
 
@@ -58,7 +58,7 @@ export const settings = definePluginSettings({
     },
     uiShortcutAction: {
         type: OptionType.SELECT,
-        description: "Action performed when right-clicking the chat bar icon.",
+        description: "What happens when you right-click the chat bar button.",
         default: "toggleAutoJoin",
         options: [
             { label: "No action", value: "none" },
@@ -68,7 +68,7 @@ export const settings = definePluginSettings({
     },
     uiShowKeywords: {
         type: OptionType.BOOLEAN,
-        description: "Show keywords for triggers in the chat bar menu.",
+        description: "Show keywords for triggers in the chat bar button's menu.",
         default: true
     },
 
@@ -77,7 +77,7 @@ export const settings = definePluginSettings({
     */
     monitorChannelList: {
         type: OptionType.STRING,
-        description: "Comma-separated channel IDs to monitor for valid server links.",
+        description: "Comma-separated channel IDs that will be monitored for private server links.",
         default: ""
     },
     monitorNavigateToChannelsOnStartup: {
@@ -87,17 +87,17 @@ export const settings = definePluginSettings({
     },
     monitorBlockedUserList: {
         type: OptionType.STRING,
-        description: "Comma-separated user IDs to ignore messages from when monitoring channels. This will only work if you're verifying server links.",
+        description: "Comma-separated user IDs that will be ignored when monitoring for private server links.",
         default: ""
     },
     monitorBlockUnsafeServerMessageAuthors: {
         type: OptionType.BOOLEAN,
-        description: "Automatically put users who post unsafe server links into the monitorBlockedUserList.",
+        description: "Automatically put users who sends server links which leads to non-allowed places into the monitorBlockedUserList. This will only work if you are verifying links.",
         default: false
     },
     monitorGreedyMode: {
         type: OptionType.BOOLEAN,
-        description: "Ignore monitorChannelList and simply monitor all possible channels.",
+        description: "Ignore monitorChannelList and simply monitor all possible channels. Not recommended.",
         default: false
     },
     monitorGreedyExceptionList: {
@@ -128,7 +128,7 @@ export const settings = definePluginSettings({
     verifyAllowedPlaceIds: {
         type: OptionType.STRING,
         description: "Comma-separated list of allowed place IDs. If empty, all place IDs are allowed.",
-        default: ""
+        default: "15532962292"
     },
     verifyBlockedPlaceIds: {
         type: OptionType.STRING,
@@ -137,12 +137,12 @@ export const settings = definePluginSettings({
     },
     verifyAfterJoinFailFallbackDelayMs: {
         type: OptionType.NUMBER,
-        description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
+        description: "If the place ID verification after joining fails, wait this many milliseconds before executing the safety action.",
         default: 5000
     },
     verifyAfterJoinFailFallbackAction: {
         type: OptionType.SELECT,
-        description: "Action to execute when verification after joining fails.",
+        description: "Action to execute when place ID verification fails after you already joined the server.",
         default: "joinSols",
         options: [
             { label: "Join Sol's RNG public server", value: "joinSols" },
