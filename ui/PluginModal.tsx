@@ -131,7 +131,7 @@ export function PluginModal({ rootProps }: { rootProps: ModalProps; }) {
                     <Line />
                     <Setting setting="_dev_verification_fail_fallback_delay_ms" customTitle="Verification Fail Fallback Delay (ms)" />
                     <Line />
-                    <Setting setting="_dev_joinAutomaticReenable" customTitle="Auto Re-enable" />
+                    <Setting setting="_dev_joinReenableAutomatically" customTitle="Auto Re-enable" />
                     <Setting setting="_dev_joinAutomaticReenableDelaySeconds" customTitle="Auto Re-enable Delay (seconds)" />
                     <BaseButton onClick={addFakeJoin}>➕ Add Fake Join</BaseButton>
                 </Section>

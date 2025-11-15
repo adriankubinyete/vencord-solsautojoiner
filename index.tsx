@@ -7,11 +7,11 @@
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import definePlugin from "@utils/types";
 import type { Message } from "@vencord/discord-types";
-import { ChannelRouter, ChannelStore, GuildStore, Menu, NavigationRouter } from "@webpack/common";
+import { ChannelRouter, ChannelStore, GuildStore, Menu, NavigationRouter, Toasts } from "@webpack/common";
 
 import { settings, TriggerKeywords } from "./settings";
 import { CustomChatBarButton } from "./ui/ChatBarButton";
-import { ChannelTypes, createLogger, jumpToMessage, sendNotification } from "./utils/index";
+import { ChannelTypes, createLogger, jumpToMessage, sendNotification, showToast } from "./utils/index";
 import { recentJoinStore } from "./utils/RecentJoinStore";
 import { IJoinData, RobloxLinkHandler } from "./utils/RobloxLinkHandler";
 
@@ -188,9 +188,9 @@ export default definePlugin({
 
                 // Auto-disable after successful real join
                 if (wasJoined && !isBait) {
+                    if (settings.store._dev_joinReenableAutomatically) handleDebounce();
                     if (settings.store.joinDisableAfterAutoJoin) settings.store.joinEnabled = false;
                     if (settings.store.notifyDisableAfterAutoJoin) settings.store.notifyEnabled = false;
-                    if (settings.store._dev_joinAutomaticReenable) handleDebounce();
                 }
             }
 
@@ -350,21 +350,34 @@ async function handleJoin(ctx) {
 }
 
 function handleDebounce(): void {
-    if (!settings.store._dev_joinAutomaticReenable) return;
+    if (!settings.store._dev_joinReenableAutomatically) return;
 
     const debounceMs = (settings.store._dev_joinAutomaticReenableDelaySeconds || 60) * 1000;
     if (debounceMs <= 0) return;
 
-    // Immediately set to false (but only if it's currently true)
     if (settings.store.joinEnabled) {
         settings.store.joinEnabled = false;
     }
 
+    if (settings.store.notifyEnabled) {
+        settings.store.notifyEnabled = false;
+    }
+
     // Schedule re-enable after debounceMs, but only if still false
     setTimeout(() => {
+        let message: string = "";
         if (settings.store.joinEnabled === false) {
             settings.store.joinEnabled = true;
+            message = "AutoJoin";
         }
-        // If already true (user toggled early), do nothing
+
+        if (settings.store.notifyEnabled === false && settings.store.uiShortcutAction === "toggleJoinAndNotifications") {
+            settings.store.notifyEnabled = true;
+            message = message ? message + " and Notifications" : "Notifications";
+        }
+
+        if (!message) return; // nothing needs to be reenabled, user possibly already did it
+
+        showToast(message + " re-enabled.", Toasts.Type.SUCCESS);
     }, debounceMs);
 }

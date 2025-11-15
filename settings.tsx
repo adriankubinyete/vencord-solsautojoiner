@@ -196,7 +196,7 @@ export const settings = definePluginSettings({
         description: "If verification after joining fails, wait this many milliseconds before executing the safety action.",
         default: 5000
     },
-    _dev_joinAutomaticReenable: {
+    _dev_joinReenableAutomatically: {
         type: OptionType.BOOLEAN,
         description: "Automatically re-enable auto-join after a successful join. Only useful with joinDisableAfterAutoJoin enabled.",
         default: false,
@@ -210,31 +210,6 @@ export const settings = definePluginSettings({
     },
 
 });
-
-// Config geral do plugin
-export interface ICoreSettings {
-    joinEnabled: boolean;
-    notifyEnabled: boolean;
-    joinCloseGameBefore: boolean;
-    joinDisableAfterAutoJoin: boolean;
-    notifyDisableAfterAutoJoin: boolean;
-    uiShowChatBarIcon: boolean;
-    uiShortcutAction: "none" | "toggleJoin" | "toggleJoinAndNotifications";
-    monitorChannelList: string;
-    monitorNavigateToChannelsOnStartup: boolean;
-    monitorBlockedUserList: string;
-    monitorBlockUnsafeServerMessageAuthors: boolean;
-    verifyRoblosecurityToken: string;
-    verifyMode: "none" | "before" | "after";
-    verifyAllowedPlaceIds: string;
-    verifyBlockedPlaceIds: string;
-    verifyAfterJoinFailFallbackDelayMs: number;
-    verifyAfterJoinFailFallbackAction: "joinSols" | "quit";
-    loggingLevel: "trace" | "debug" | "perf" | "info" | "warn" | "error";
-    monitorGreedyMode: boolean;
-    _dev_joinDebounceEnabled: boolean;
-    _dev_joinDebounceMs: number;
-}
 
 // Config dos biomes
 export interface ITriggerSettings {
@@ -254,8 +229,6 @@ export interface ITriggerSettings {
     MARI: boolean;
     JESTER: boolean;
 }
-
-export type JoinerSettings = ICoreSettings & ITriggerSettings;
 
 export const TriggerKeywords = {
     GLITCHED: {
