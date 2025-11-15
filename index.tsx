@@ -18,6 +18,16 @@ import { IJoinData, RobloxLinkHandler } from "./utils/RobloxLinkHandler";
 const PLUGIN_NAME = "SolsRadar";
 const baselogger = createLogger(PLUGIN_NAME);
 
+const CHANNEL_TYPES_TO_SKIP = [ChannelTypes.DM, ChannelTypes.GROUP_DM] as const;
+const SOLS_PLACE_ID = "15532962292"; // Hardcoded no original, mantido
+const SOLS_JOIN_DATA = {
+    ok: true,
+    code: "",
+    link: "",
+    type: "public",
+    placeId: SOLS_PLACE_ID,
+} as const;
+
 const patchChannelContextMenu: NavContextMenuPatchCallback = (children, { channel }) => {
     if (!channel) return children;
 
@@ -118,153 +128,75 @@ export default definePlugin({
         },
 
         async MESSAGE_CREATE({ message, optimistic }: { message: Message, optimistic: boolean; }) {
-            const log = baselogger.inherit(`${message.id}`);
             if (optimistic) return;
 
+            const log = baselogger.inherit(`${message.id}`);
+
+            // get author, channel and guild objects
             const channel = ChannelStore.getChannel(message.channel_id);
-            const channelName: string = channel.name;
-            const channelId: string = channel.id;
-            const authorId = message.author?.id ?? "Unknown ID";
-            const authorUsername = message.author?.username ?? "Unknown Username";
-            let guildName: string | undefined = "Unknown Guild";
-            let guildId: string | undefined = "Unknown Guild ID";
+            if (CHANNEL_TYPES_TO_SKIP.includes(channel.type)) return; // early return: not a channel type we care
 
-            // not a valid channel (idc about these)
-            switch (channel.type) {
-                case ChannelTypes.DM:
-                case ChannelTypes.GROUP_DM:
-                    return;
-            }
+            const guild = GuildStore.getGuild(channel.guild_id);
+            if (!guild) return; // this message doesnt have a guild??
 
-            if (channel.guild_id) {
-                const guild = GuildStore.getGuild(channel.guild_id);
-                guildName = guild.name;
-                guildId = guild.id;
-            }
+            const { author } = message;
 
-            if (isUserBlocked(message.author.id)) return;
-            // log.trace("settings.store._dev_greedy_monitoring : ", settings.store._dev_greedy_monitoring, "isMonitoredChannel(channelId) : ", isMonitoredChannel(channelId));
-            if (!settings.store.monitorGreedyMode && !isMonitoredChannel(channelId)) return; // assures that channel is monitored or we are in greedy mode
-            if (settings.store.monitorGreedyMode && isGreedyIgnoredChannel(channelId)) return;
+            // normalize some final stuff
+            const avatarUrl = `https://cdn.discordapp.com/avatars/${author.id}/${author.avatar}.png`;
+            const messageJumpUrl = `https://discord.com/channels/${guild.id}/${channel.id}/${message.id}`;
 
+            // "early" ignore some stuff
+            if (!author.id || isUserBlocked(message.author.id)) return; // ignore plugin-blocked users
+            if (!settings.store.monitorGreedyMode && !isMonitoredChannel(channel.id)) return; // non-greedy: ignore non-monitored channels
+            if (settings.store.monitorGreedyMode && isGreedyIgnoredChannel(channel.id)) return; // greedy: ignore greedy-ignored channels
+
+            // roblox server link verification
             const ro = new RobloxLinkHandler(settings, log);
-            const link = ro.extract(message.content); // get link from msg content
-            if (!link || !link.ok) return;
+            const link = ro.extract(message.content); // TODO: make this handle embeds too
+            if (!link || !link.ok) return; // message does not have a roblox server link
 
-            // if we got here, that means the message has a valid roblox link. now we must check trigger words before deciding what to do
-            const matches = findKeywords(message.content);
-            switch (matches.length) {
-                case 0:
-                    log.info("❌ No match found");
-                    return;
-                case 1:
-                    log.info("✅ Match found: ", matches[0]);
-                    break;
-                default:
-                    log.warn(`❌ Multiple keyword matches (${matches.join(", ")})`);
-                    return;
-            }
-            const matchName = matches[0];
-            if (!settings.store[matchName]) {
-                log.info("❌ Match found but disabled: ", matchName);
-                return;
-            }
-            const match = TriggerKeywords[matchName];
+            // does the message contain a trigger word that is enabled?
+            const match = getSingleTriggerMatch(message.content, log);
+            if (!match) return; // multiple or no match
 
+            // snapshots the current config, because this will change as we go
             const shouldNotify = settings.store.notifyEnabled;
             const shouldJoin = settings.store.joinEnabled;
-            let joinData: IJoinData | null = null;
+
+            // Build context
+            const ctx = {
+                message,
+                author,
+                channel,
+                guild,
+                ro,
+                link,
+                match,
+                log,
+                avatarUrl,
+                messageJumpUrl,
+                joinData: null as IJoinData | null
+            };
 
             if (shouldJoin) {
-                log.debug("Executing join");
-                joinData = await ro.safelyJoin(link);
-                recentJoinStore.add({
-                    title: `${match.name} sniped!`,
-                    description: `Sent in ${channelName} (${guildName})`,
-                    iconUrl: match.iconUrl,
-                    authorName: authorUsername,
-                    authorAvatarUrl: `https://cdn.discordapp.com/avatars/${authorId}/${message.author?.avatar}.png`,
-                    messageJumpUrl: `https://discord.com/channels/${guildId}/${channelId}/${message.id}`,
-                    joinStatus: joinData
-                });
+                const { joinData, wasJoined, isBait } = await handleJoin(ctx);
+                ctx.joinData = joinData;
 
-                // fake link, destroy the fucker
-                if (joinData && joinData.verified && joinData.safe === false) {
-                    if (settings.store.monitorBlockUnsafeServerMessageAuthors) settings.store.monitorBlockedUserList += `,${authorId}`;
-
-                    log.warn("Bait link detected, safety action will commence soon");
-                    setTimeout(async () => {
-                        log.info("Executing safety action");
-                        switch (settings.store.verifyAfterJoinFailFallbackAction) {
-                            case "joinSols":
-                                await ro.executeJoin({
-                                    ok: true,
-                                    code: "",
-                                    link: "",
-                                    type: "public",
-                                    placeId: "15532962292"
-                                });
-                                break;
-                            default:
-                                ro.closeRoblox();
-                                break;
-                        }
-                    }, settings.store.verifyAfterJoinFailFallbackDelayMs);
+                if (isBait) {
+                    handleBait(ctx);
                 }
 
-                // respeita disableAfterAutoJoin, EXCETO se for uma bait
-                if (joinData && joinData.joined) {
-                    const isBait = joinData.verified === true && joinData.safe === false;
-
-                    if (!isBait) {
-                        if (settings.store.joinDisableAfterAutoJoin) {
-                            settings.store.joinEnabled = false;
-                        }
-                        if (settings.store.notifyDisableAfterAutoJoin) {
-                            settings.store.notifyEnabled = false;
-                        }
-                    }
+                // Auto-disable after successful real join
+                if (wasJoined && !isBait) {
+                    if (settings.store.joinDisableAfterAutoJoin) settings.store.joinEnabled = false;
+                    if (settings.store.notifyDisableAfterAutoJoin) settings.store.notifyEnabled = false;
                 }
             }
 
             if (shouldNotify) {
-                let title = `🎯 SoRa :: Sniped ${match.name}`;
-                let content = `From user ${authorUsername}\nSent in ${channelName} (${guildName})`;
-                let onClick = () => { ro.safelyJoin(link); };
-
-                if (joinData) {
-                    onClick = () => { jumpToMessage(message.id, channelId, guildId); };
-
-                    if (joinData.joined) {
-                        title = `🎯 SoRa :: Joined ${match.name}`;
-                    }
-
-                    if (joinData.verified === false) {
-                        content += "\n⚠️ Link was not verified";
-                    }
-
-                    if (joinData.verified && joinData.safe === true) {
-                        content += "\n✅ Link was verified";
-                    }
-
-                    if (joinData.verified && joinData.safe === false) {
-                        title = `⚠️ SoRa :: Bait link detected (${match.name})`;
-
-                        if (joinData.joined) {
-                            title += " - click to go to message";
-                            content += `\nSafety action triggered! (${settings.store.verifyAfterJoinFailFallbackAction})`;
-                        }
-                    }
-
-                    if (joinData.message) {
-                        content += `\n${joinData.message}`;
-                    }
-                } else {
-                    title += " - click to join!";
-                }
-
+                const notif = buildNotification(ctx);
                 log.debug("Sending notification");
-                sendNotification({ title, content, icon: match.iconUrl, onClick });
+                sendNotification(notif);
             }
 
         }
@@ -286,6 +218,7 @@ function isUserBlocked(userId: string) {
     return new Set(settings.store.monitorBlockedUserList.split(",").map(id => id.trim()).filter(Boolean)).has(userId);
 }
 
+// Returns an array of matches that fits TriggerKeywords.keywords
 function findKeywords(text: string): string[] {
     const normalized = text.toLowerCase();
 
@@ -300,4 +233,117 @@ function findKeywords(text: string): string[] {
         .map(([key]) => key);
 
     return matches;
+}
+
+// extracts a single enabled TriggerKeyword match from the message content.
+// - returns the TriggerKeyword object if all matched keywords resolve to exactly one unique enabled trigger
+// - returns null otherwise: no matches, matches from multiple different triggers (warns and fails to avoid ambiguity)
+// this ensures only unambiguous, active triggers proceed.
+function getSingleTriggerMatch(
+    content: string,
+    log: any
+): any | null {
+    const matches = findKeywords(content);
+    switch (matches.length) {
+        case 0:
+            log.info("❌ No match found");
+            return null;
+        case 1:
+            const matchName = matches[0];
+            if (!settings.store[matchName]) {
+                log.info(`❌ Match found but disabled: ${matchName}`);
+                return null;
+            }
+            log.info(`✅ Match found: ${matchName}`);
+            return TriggerKeywords[matchName];
+        default:
+            log.warn(`❌ Multiple keyword matches (${matches.join(", ")})`);
+            return null;
+    }
+}
+
+function buildNotification(ctx) {
+    const { joinData, match, author, channel, guild, ro, link, message } = ctx;
+
+    let title = `🎯 SoRa :: Sniped ${match.name}`;
+    let content = `From user ${author.username}\nSent in ${channel.name} (${guild.name})`;
+
+    let onClick = () => ro.safelyJoin(link);
+
+    if (!joinData) {
+        title += " - click to join!";
+        return { title, content, icon: match.iconUrl, onClick };
+    }
+
+    onClick = () => jumpToMessage(message.id, channel.id, guild.id);
+
+    if (joinData.joined) {
+        title = `🎯 SoRa :: Joined ${match.name}`;
+    }
+
+    if (joinData.verified === false) content += "\n⚠️ Link was not verified";
+    if (joinData.verified && joinData.safe) content += "\n✅ Link was verified";
+
+    if (joinData.verified && joinData.safe === false) {
+        title = `⚠️ SoRa :: Bait link detected (${match.name})`;
+
+        if (joinData.joined) {
+            title += " - click to go to message";
+            content += `\nSafety action triggered! (${settings.store.verifyAfterJoinFailFallbackAction})`;
+        }
+    }
+
+    if (joinData.message) content += `\n${joinData.message}`;
+
+    return { title, content, icon: match.iconUrl, onClick };
+}
+
+function handleBait(ctx) {
+    const { author, ro, log } = ctx;
+
+    if (settings.store.monitorBlockUnsafeServerMessageAuthors) {
+        settings.store.monitorBlockedUserList += `,${author.id}`;
+    }
+
+    log.warn("Bait link detected, safety action will commence soon");
+
+    setTimeout(async () => {
+        log.info("Executing safety action");
+
+        if (settings.store.verifyAfterJoinFailFallbackAction === "joinSols") {
+            await ro.executeJoin({
+                ok: true,
+                code: "",
+                link: "",
+                type: "public",
+                placeId: "15532962292"
+            });
+        } else {
+            ro.closeRoblox();
+        }
+    }, settings.store.verifyAfterJoinFailFallbackDelayMs);
+}
+
+async function handleJoin(ctx) {
+    const { ro, link, match, author, channel, guild, avatarUrl, messageJumpUrl, log } = ctx;
+
+    log.debug("Executing join");
+
+    const joinData = await ro.safelyJoin(link);
+
+    recentJoinStore.add({
+        title: `${match.name} sniped!`,
+        description: `Sent in ${channel.name} (${guild.name})`,
+        iconUrl: match.iconUrl,
+        authorName: author.username,
+        authorAvatarUrl: avatarUrl,
+        messageJumpUrl,
+        joinStatus: joinData
+    });
+
+    const hasResponse = joinData != null;
+    const wasJoined = joinData?.joined === true;
+    const isBait = hasResponse && joinData.verified === true && joinData.safe === false;
+
+    return { joinData, wasJoined, isBait };
 }

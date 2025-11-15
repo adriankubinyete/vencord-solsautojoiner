@@ -16,20 +16,18 @@ export interface RecentJoin {
     iconUrl?: string;
     authorName?: string;
     authorAvatarUrl?: string;
-    messageJumpUrl?: string; // https://discord.com/channels/{guildId}/{channelId}/{messageId}
+    messageJumpUrl?: string;
     joinStatus?: {
         joined: boolean;
         verified: boolean;
         safe: boolean | undefined;
-    }
+    };
 }
 
 class RecentJoinStore {
     private _recentJoins: RecentJoin[] = [];
 
-    constructor() {
-        // In-memory only, no persistence
-    }
+    constructor() {}
 
     get all() {
         return this._recentJoins;
@@ -41,16 +39,51 @@ class RecentJoinStore {
     }
 
     load() {
-        this._recentJoins = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
+        this._recentJoins =
+            JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]") ?? [];
         console.log(`[RoSniper] Loaded ${this._recentJoins.length} recent joins.`);
     }
 
-    add(join: Omit<RecentJoin, "id" | "timestamp">) {
+    /**
+     * Add a new join.
+     * Returns: the created entry (or id if preferred)
+     */
+    add(join: Omit<RecentJoin, "id" | "timestamp">): RecentJoin {
         const now = Date.now();
-        const entry = { id: now, timestamp: now, ...join };
+        const entry: RecentJoin = { id: now, timestamp: now, ...join };
+
         this._recentJoins.unshift(entry);
 
-        if (this._recentJoins.length > 10) this._recentJoins.pop();
+        if (this._recentJoins.length > 10) {
+            this._recentJoins.pop();
+        }
+
+        return entry; // or entry.id if you prefer
+    }
+
+    /**
+     * Update an existing join by ID.
+     */
+    update(id: number, data: Partial<Omit<RecentJoin, "id" | "timestamp">>): RecentJoin | null {
+        const idx = this._recentJoins.findIndex(j => j.id === id);
+        if (idx === -1) return null;
+
+        const updated = {
+            ...this._recentJoins[idx],
+            ...data,
+        };
+
+        this._recentJoins[idx] = updated;
+        return updated;
+    }
+
+    /**
+     * Delete a join by ID.
+     */
+    delete(id: number): boolean {
+        const before = this._recentJoins.length;
+        this._recentJoins = this._recentJoins.filter(j => j.id !== id);
+        return this._recentJoins.length !== before;
     }
 
     clear() {
@@ -58,5 +91,4 @@ class RecentJoinStore {
     }
 }
 
-// Singleton export
 export const recentJoinStore = new RecentJoinStore();
