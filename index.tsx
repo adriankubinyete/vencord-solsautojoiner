@@ -186,11 +186,8 @@ export default definePlugin({
                     handleBait(ctx);
                 }
 
-                // Auto-disable after successful real join
                 if (wasJoined && !isBait) {
-                    if (settings.store._dev_joinReenableAutomatically) handleDebounce();
-                    if (settings.store.joinDisableAfterAutoJoin) settings.store.joinEnabled = false;
-                    if (settings.store.notifyDisableAfterAutoJoin) settings.store.notifyEnabled = false;
+                    handleAutoDisableAndReenable(); // handle post-join settings-related stuff
                 }
             }
 
@@ -349,35 +346,39 @@ async function handleJoin(ctx) {
     return { joinData, wasJoined, isBait };
 }
 
-function handleDebounce(): void {
-    if (!settings.store._dev_joinReenableAutomatically) return;
-
-    const debounceMs = (settings.store._dev_joinAutomaticReenableDelaySeconds || 60) * 1000;
-    if (debounceMs <= 0) return;
-
-    if (settings.store.joinEnabled) {
-        settings.store.joinEnabled = false;
+function handleAutoDisableAndReenable(): void {
+    if (!settings.store._dev_joinReenableAutomatically) {
+        // Fall back to permanent disable if not using auto-reenable
+        if (settings.store.joinDisableAfterAutoJoin) settings.store.joinEnabled = false;
+        if (settings.store.notifyDisableAfterAutoJoin) settings.store.notifyEnabled = false;
+        return;
     }
 
-    if (settings.store.notifyEnabled) {
-        settings.store.notifyEnabled = false;
-    }
+    const delaySeconds = settings.store._dev_joinAutomaticReenableDelaySeconds || 60;
+    const delayMs = delaySeconds * 1000;
+    if (delayMs <= 0) return;
 
-    // Schedule re-enable after debounceMs, but only if still false
+    // Immediately disable if currently enabled
+    const wasJoinEnabled = settings.store.joinEnabled;
+    const wasNotifyEnabled = settings.store.notifyEnabled;
+    settings.store.joinEnabled = false;
+    settings.store.notifyEnabled = false;
+
+    // Schedule conditional re-enable
     setTimeout(() => {
-        let message: string = "";
-        if (settings.store.joinEnabled === false) {
+        let reenabled = "";
+        if (wasJoinEnabled && settings.store.joinEnabled === false) {
             settings.store.joinEnabled = true;
-            message = "AutoJoin";
+            reenabled = "AutoJoin";
         }
 
-        if (settings.store.notifyEnabled === false && settings.store.uiShortcutAction === "toggleJoinAndNotifications") {
+        if (wasNotifyEnabled && settings.store.notifyEnabled === false && settings.store.uiShortcutAction === "toggleJoinAndNotifications") {
             settings.store.notifyEnabled = true;
-            message = message ? message + " and Notifications" : "Notifications";
+            reenabled = reenabled ? `${reenabled} and Notifications` : "Notifications";
         }
 
-        if (!message) return; // nothing needs to be reenabled, user possibly already did it
-
-        showToast(message + " re-enabled.", Toasts.Type.SUCCESS);
-    }, debounceMs);
+        if (reenabled) {
+            showToast(`${reenabled} re-enabled.`, Toasts.Type.SUCCESS);
+        }
+    }, delayMs);
 }
